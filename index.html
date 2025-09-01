@@ -5,52 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Operator Performance Report</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h2, h3 { text-align: center; margin: 20px 0; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-      text-align: center;
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+    h2 { text-align: center; margin-bottom: 10px; }
+    .card {
+      background: white; padding: 20px; margin-bottom: 20px;
+      border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    table, th, td {
-      border: 1px solid black;
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    table, th, td { border: 1px solid #333; }
+    th, td { padding: 8px; text-align: center; }
+    th { background: #555; color: white; }
+    select, input, button {
+      padding: 8px; margin: 5px;
+      border-radius: 5px; border: 1px solid #ccc;
     }
-    th {
-      background-color: #555;
-      color: white;
-      padding: 8px;
+    button {
+      background: #007bff; color: white; cursor: pointer;
     }
-    td {
-      padding: 8px;
-    }
-    .controls {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-      justify-content: center;
-    }
-    .controls input, .controls select, .controls button {
-      padding: 8px;
-      font-size: 14px;
-    }
+    button:hover { background: #0056b3; }
   </style>
 </head>
 <body>
-  <h2>Operator Performance Report</h2>
 
-  <div class="controls">
-    <input type="date" id="dateInput">
-    <select id="operatorSelect">
-      <option value="">Select Operator</option>
-    </select>
-    <button id="generateBtn">Generate Report</button>
+  <div class="card">
+    <h2>Operator Performance Report</h2>
+    <label for="date">Select Date:</label>
+    <input type="date" id="date" />
+    <label for="operatorSelect">Select Operator:</label>
+    <select id="operatorSelect"><option value="">--Select--</option></select>
+    <button onclick="generateReport()">Generate Report</button>
   </div>
 
-  <div id="reportContent">
-    <!-- Production Details Table -->
-    <h3>2. Production Details (SKU-wise)</h3>
-    <table id="skuTable">
+  <div class="card" id="productionDetails">
+    <h2>2. Production Details (SKU-wise)</h2>
+    <table id="productionTable">
       <thead>
         <tr>
           <th>SKU</th>
@@ -61,10 +49,11 @@
       </thead>
       <tbody></tbody>
     </table>
+  </div>
 
-    <!-- Machine Performance Summary -->
-    <h3>3. Machine Performance Summary</h3>
-    <table id="machineSummaryTop">
+  <div class="card" id="machinePerformance">
+    <h2>3. Machine Performance Summary</h2>
+    <table>
       <thead>
         <tr>
           <th>OEE</th>
@@ -73,17 +62,17 @@
           <th>Quality</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="oeeSummary">
         <tr>
-          <td id="oeeCell">-</td>
-          <td id="performanceCell">-</td>
-          <td id="availabilityCell">-</td>
-          <td id="qualityCell">-</td>
+          <td id="oeeVal">-</td>
+          <td id="perfVal">-</td>
+          <td id="availVal">-</td>
+          <td id="qualVal">-</td>
         </tr>
       </tbody>
     </table>
 
-    <table id="machineSummaryBottom">
+    <table style="margin-top: 15px;">
       <thead>
         <tr>
           <th>Performance</th>
@@ -91,132 +80,128 @@
           <th>Quality</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="summaryDetails">
         <tr>
-          <td id="plannedProduction">Planned Production: -</td>
-          <td id="plannedTime">Planned Production Time: -</td>
-          <td id="actualProduction">Actual Production: -</td>
-        </tr>
-        <tr>
-          <td id="actualProductionPerf">Actual Production: -</td>
-          <td id="runtime">Runtime: -</td>
-          <td id="goodProduction">Good Production: -</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td id="downtime">Downtime: -</td>
-          <td></td>
+          <td>Planned Production: <span id="plannedProduction">-</span><br>
+              Actual Production: <span id="actualProduction">-</span></td>
+          <td>Planned Production Time: <span id="plannedProdTime">-</span> min<br>
+              Runtime: <span id="runtimeMin">-</span> min<br>
+              Downtime: <span id="downtimeMin">-</span> min</td>
+          <td>Actual Production: <span id="actualProdQuality">-</span><br>
+              Good Production: <span id="goodProduction">-</span></td>
         </tr>
       </tbody>
     </table>
   </div>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    const deviceId = '991cf500-661a-11f0-90f1-775fee303094';
-    const apiUrl = `https://demo.thingsboard.io/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries`;
+    const apiUrl = "https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE";
+    const deviceId = "991cf500-661a-11f0-90f1-775fee303094";
+    let token = new URLSearchParams(window.location.search).get('token');
 
-    const dateInput = document.getElementById('dateInput');
-    const operatorSelect = document.getElementById('operatorSelect');
-    const generateBtn = document.getElementById('generateBtn');
+    const keys = [
+      "SKU", "Operator_Name", "Downtime_Submit", "Downtime_Duration",
+      "Downtime_Reason_Code", "Machine_Speed", "Standard_Speed",
+      "Runtime", "Downtime", "Idletime",
+      "deltaperformance", "deltaavailability", "deltaoee", "deltaquality"
+    ];
 
-    let fetchedData = [];
-
-    // Fetch operator list when date is selected
-    dateInput.addEventListener('change', async () => {
-      const date = dateInput.value;
+    // Populate operator dropdown on date change
+    document.getElementById('date').addEventListener('change', async () => {
+      const date = document.getElementById('date').value;
       if (!date) return;
-
       const startTime = new Date(`${date}T00:00:00`).getTime();
       const endTime = new Date(`${date}T23:59:59`).getTime();
+      const url = `${apiUrl}/${deviceId}/values/timeseries?keys=${keys.join(',')}&startTs=${startTime}&endTs=${endTime}&limit=5000`;
 
-      const keys = "SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee,deltaquality";
-      const response = await fetch(`${apiUrl}?keys=${keys}&startTs=${startTime}&endTs=${endTime}&limit=10000`, {
+      const response = await fetch(url, {
         headers: { 'X-Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
 
-      // Group by timestamp minute
-      fetchedData = [];
-      Object.keys(data).forEach(key => {
-        data[key].forEach(entry => {
-          const tsMinute = Math.floor(entry.ts / 60000) * 60000;
-          let record = fetchedData.find(r => r.ts === tsMinute);
-          if (!record) {
-            record = { ts: tsMinute };
-            fetchedData.push(record);
-          }
-          record[key] = entry.value;
-        });
-      });
-
-      // Populate operator dropdown
-      const operators = [...new Set(fetchedData.map(d => d.Operator_Name).filter(Boolean))];
-      operatorSelect.innerHTML = '<option value="">Select Operator</option>';
+      let operators = new Set();
+      if (data.Operator_Name) {
+        data.Operator_Name.forEach(item => operators.add(item.value));
+      }
+      const operatorSelect = document.getElementById('operatorSelect');
+      operatorSelect.innerHTML = `<option value="">--Select--</option>`;
       operators.forEach(op => {
-        const opt = document.createElement('option');
-        opt.value = op;
-        opt.textContent = op;
-        operatorSelect.appendChild(opt);
+        operatorSelect.innerHTML += `<option value="${op}">${op}</option>`;
       });
     });
 
-    // Generate report
-    generateBtn.addEventListener('click', () => {
-      const operator = operatorSelect.value;
-      if (!operator) {
-        alert('Please select an operator');
+    async function generateReport() {
+      const date = document.getElementById('date').value;
+      const operator = document.getElementById('operatorSelect').value;
+      if (!date || !operator) {
+        alert('Please select date and operator');
         return;
       }
 
-      const operatorData = fetchedData.filter(d => d.Operator_Name === operator);
+      const startTime = new Date(`${date}T00:00:00`).getTime();
+      const endTime = new Date(`${date}T23:59:59`).getTime();
+      const url = `${apiUrl}/${deviceId}/values/timeseries?keys=${keys.join(',')}&startTs=${startTime}&endTs=${endTime}&limit=5000`;
 
-      // Build SKU table
+      const response = await fetch(url, {
+        headers: { 'X-Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+
+      // Group telemetry data by minute
+      const groupedData = {};
+      keys.forEach(k => { if (data[k]) {
+        data[k].forEach(item => {
+          const minute = Math.floor(item.ts / 60000);
+          if (!groupedData[minute]) groupedData[minute] = {};
+          groupedData[minute][k] = item.value;
+        });
+      }});
+
+      const filtered = Object.values(groupedData).filter(row => row.Operator_Name === operator);
+
+      // Production Details Table
       const skuData = {};
-      operatorData.forEach(row => {
-        const sku = row.SKU || 'Unknown';
-        if (!skuData[sku]) {
-          skuData[sku] = { production: 0, runtime: 0, downtime: 0 };
+      filtered.forEach(row => {
+        if (!skuData[row.SKU]) {
+          skuData[row.SKU] = { production: 0, runtime: 0, downtime: 0 };
         }
-        skuData[sku].production += parseFloat(row.Machine_Speed || 0);
-        skuData[sku].runtime += parseFloat(row.Runtime || 0);
-        skuData[sku].downtime += parseFloat(row.Downtime || 0);
+        skuData[row.SKU].production += Number(row.Machine_Speed || 0);
+        skuData[row.SKU].runtime += Number(row.Runtime || 0);
+        skuData[row.SKU].downtime += Number(row.Downtime || 0);
       });
 
-      const skuTableBody = document.querySelector('#skuTable tbody');
-      skuTableBody.innerHTML = '';
-      Object.keys(skuData).forEach(sku => {
-        const { production, runtime, downtime } = skuData[sku];
-        const row = `<tr>
-          <td>${sku}</td>
-          <td>${production}</td>
-          <td>${(runtime/60).toFixed(1)}</td>
-          <td>${(downtime/60).toFixed(1)}</td>
-        </tr>`;
-        skuTableBody.innerHTML += row;
+      const tbody = document.querySelector('#productionTable tbody');
+      tbody.innerHTML = '';
+      Object.entries(skuData).forEach(([sku, details]) => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${sku}</td>
+            <td>${details.production}</td>
+            <td>${(details.runtime / 60).toFixed(2)}</td>
+            <td>${(details.downtime / 60).toFixed(2)}</td>
+          </tr>
+        `;
       });
 
-      // Machine Performance Summary
+      // Machine Performance Summary - averages
       const avg = (key) => {
-        const values = operatorData.map(d => parseFloat(d[key] || 0));
-        return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(0) : '-';
+        const vals = filtered.map(r => parseFloat(r[key] || 0));
+        return vals.length ? (vals.reduce((a,b) => a+b,0)/vals.length).toFixed(2) : 0;
       };
+      document.getElementById('oeeVal').innerText = `${avg('deltaoee')}%`;
+      document.getElementById('perfVal').innerText = `${avg('deltaperformance')}%`;
+      document.getElementById('availVal').innerText = `${avg('deltaavailability')}%`;
+      document.getElementById('qualVal').innerText = `${avg('deltaquality')}%`;
 
-      document.getElementById('oeeCell').textContent = avg('deltaoee') + '%';
-      document.getElementById('performanceCell').textContent = avg('deltaperformance') + '%';
-      document.getElementById('availabilityCell').textContent = avg('deltaavailability') + '%';
-      document.getElementById('qualityCell').textContent = avg('deltaquality') + '%';
-
-      // Placeholder for bottom table values
-      document.getElementById('plannedProduction').textContent = `Planned Production: ${operatorData.length * 100}`;
-      document.getElementById('plannedTime').textContent = `Planned Production Time: ${operatorData.length * 10} min`;
-      document.getElementById('actualProduction').textContent = `Actual Production: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Machine_Speed || 0)), 0)}`;
-      document.getElementById('actualProductionPerf').textContent = `Actual Production: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Machine_Speed || 0)), 0)}`;
-      document.getElementById('runtime').textContent = `Runtime: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Runtime || 0)), 0)} min`;
-      document.getElementById('goodProduction').textContent = `Good Production: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Machine_Speed || 0)), 0)}`;
-      document.getElementById('downtime').textContent = `Downtime: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Downtime || 0)), 0)} min`;
-    });
+      // Additional summary placeholders (static values for now)
+      document.getElementById('plannedProduction').innerText = '8,752';
+      document.getElementById('actualProduction').innerText = '2,458';
+      document.getElementById('plannedProdTime').innerText = '862';
+      document.getElementById('runtimeMin').innerText = '700';
+      document.getElementById('downtimeMin').innerText = '162';
+      document.getElementById('actualProdQuality').innerText = '8,752';
+      document.getElementById('goodProduction').innerText = '7,589';
+    }
   </script>
 </body>
 </html>
