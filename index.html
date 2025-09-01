@@ -1,283 +1,204 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
   <title>Operator Performance Report</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; padding: 18px; background:#f7fafc; color:#111; }
-    h2 { margin: 0 0 12px; }
-    .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
-    input[type="date"], select { padding:8px 10px; border-radius:6px; border:1px solid #d1d5db; }
-    button { padding:9px 12px; background:#2563eb; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600; }
-    button:disabled { opacity:.6; cursor:not-allowed; }
-    .card { background: #fff; padding:14px; border-radius:10px; border:1px solid #e6e9ef; margin-bottom:14px; }
-    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
-    th, td { padding:8px; border:1px solid #e6e9ef; text-align:center; }
-    th { background:#f8fafc; font-weight:700; }
-    .muted { color:#6b7280; font-size:13px; }
-    .small { font-size:12px; color:#6b7280; }
-    pre { background:#f3f4f6; padding:8px; border-radius:6px; overflow:auto; max-height:180px; }
-    .error { color:#991b1b; background:#fff1f2; padding:8px; border-radius:6px; border:1px solid #fecaca; margin-top:8px; }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { color: #333; }
+    select, input, button { padding: 8px; margin: 10px; font-size: 14px; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 5px; max-height: 500px; overflow: auto; }
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+    table, th, td { border: 1px solid #ccc; text-align: center; padding: 8px; }
+    th { background: #f0f0f0; }
   </style>
 </head>
 <body>
   <h2>Operator Performance Report</h2>
+  
+  <label for="datePicker">Select Date:</label>
+  <input type="date" id="datePicker">
 
-  <div class="controls">
-    <label for="datePicker">Date</label>
-    <input id="datePicker" type="date" />
-    <label for="operatorSelect">Operator</label>
-    <select id="operatorSelect"><option value="">-- Select Operator --</option></select>
-    <button id="generateBtn">Generate</button>
-    <div id="status" class="small muted" style="margin-left:12px"></div>
-  </div>
+  <label for="operatorSelect">Select Operator:</label>
+  <select id="operatorSelect">
+    <option value="">-- Select Operator --</option>
+  </select>
 
-  <div id="errorBox" style="display:none" class="error"></div>
+  <button id="generateBtn">Generate Report</button>
 
-  <div id="reportOutput"></div>
-  <pre id="debugOutput" style="display:none"></pre>
+  <div id="report"></div>
 
-<script>
-/* ---------- Configuration ---------- */
-const DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
-const API_BASE = "https://plantwiz.pimateck.in/api";
-const qs = new URLSearchParams(window.location.search);
-const TOKEN = qs.get('token') || "";
+  <script>
+    const deviceId = "991cf500-661a-11f0-90f1-775fee303094";
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
 
-/* ---------- DOM ---------- */
-const datePicker = document.getElementById('datePicker');
-const operatorSelect = document.getElementById('operatorSelect');
-const btnGenerate = document.getElementById('generateBtn');
-const status = document.getElementById('status');
-const reportOutput = document.getElementById('reportOutput');
-const errorBox = document.getElementById('errorBox');
-const debugOutput = document.getElementById('debugOutput');
+    const datePicker = document.getElementById("datePicker");
+    const operatorSelect = document.getElementById("operatorSelect");
+    const reportDiv = document.getElementById("report");
 
-/* ---------- Helpers ---------- */
-function showError(msg) {
-  if (!msg) { errorBox.style.display = 'none'; errorBox.textContent = ''; return; }
-  errorBox.style.display = 'block';
-  errorBox.textContent = msg;
-}
-function setStatus(txt) { status.textContent = txt || ''; }
-function safeNum(v) {
-  if (v === undefined || v === null) return NaN;
-  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', ''));
-  return Number.isFinite(n) ? n : NaN;
-}
-function normalizeToMinute(ts) {
-  const d = new Date(+ts);
-  d.setSeconds(0, 0);
-  return d.getTime();
-}
-
-/* ---------- Telemetry keys ---------- */
-const KEYS_LIST = [
-  "SKU","Operator_Name","Downtime_Submit","Downtime_Duration","Downtime_Reason_Code",
-  "Machine_Speed","Standard_Speed","Runtime","Downtime","Idletime",
-  "deltaperformance","deltaavailability","deltaoee","deltaquality",
-  "Good_Production","Planned_Production","Planned_Production_Time"
-];
-const KEYS_PARAM = KEYS_LIST.join(',');
-
-/* ---------- Fetch timeseries ---------- */
-async function fetchTelemetryForDate(dateStr) {
-  if (!TOKEN) throw new Error("Missing token in URL (?token=YOUR_JWT)");
-  const start = new Date(dateStr + "T00:00:00").getTime();
-  const end   = new Date(dateStr + "T23:59:59").getTime();
-  const url = `${API_BASE}/plugins/telemetry/DEVICE/${DEVICE_ID}/values/timeseries?keys=${encodeURIComponent(KEYS_PARAM)}&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
-  const res = await fetch(url, { headers: { "X-Authorization": `Bearer ${TOKEN}` } });
-  if (!res.ok) {
-    const txt = await res.text().catch(()=>res.statusText);
-    throw new Error(`Telemetry fetch failed: ${res.status} ${txt}`);
-  }
-  return res.json();
-}
-
-/* ---------- Build rows aligned by minute ---------- */
-function buildRowsFromTimeseries(tsObj) {
-  const map = new Map();
-  Object.entries(tsObj || {}).forEach(([key, arr])=>{
-    (arr || []).forEach(p=>{
-      const minute = normalizeToMinute(p.ts);
-      const row = map.get(minute) || { ts: minute };
-      row[key] = p.value;
-      map.set(minute, row);
-    });
-  });
-  return Array.from(map.values()).sort((a,b)=>a.ts-b.ts);
-}
-
-/* ---------- Load operators ---------- */
-async function loadOperators(dateStr) {
-  try {
-    showError('');
-    setStatus('Loading operators…');
-    operatorSelect.innerHTML = '<option value="">Loading…</option>';
-    const ts = await fetchTelemetryForDate(dateStr);
-    const ops = (ts.Operator_Name || []).map(x => String(x.value).trim()).filter(s => s);
-    const unique = [...new Set(ops)];
-    operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
-    unique.forEach(op => operatorSelect.appendChild(new Option(op, op)));
-    setStatus(unique.length ? `Found ${unique.length} operator(s)` : 'No operators found');
-  } catch (err) {
-    operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
-    showError(err.message || String(err));
-    setStatus('');
-    console.error(err);
-  }
-}
-
-/* ---------- Generate report ---------- */
-async function generateReport() {
-  showError('');
-  reportOutput.innerHTML = '';
-  debugOutput.style.display = 'none';
-  const dateStr = datePicker.value;
-  const operator = operatorSelect.value;
-  if (!dateStr) { showError('Please select a date.'); return; }
-  if (!operator) { showError('Please select an operator.'); return; }
-  try {
-    setStatus('Fetching telemetry and computing report…');
-    const ts = await fetchTelemetryForDate(dateStr);
-    const rows = buildRowsFromTimeseries(ts);
-
-    const opRows = rows.filter(r => (r.Operator_Name || '').trim() === operator);
-    if (opRows.length === 0) {
-      reportOutput.innerHTML = `<div class="card"><div class="muted">No records found for ${operator} on ${dateStr}.</div></div>`;
-      setStatus('');
-      return;
+    function normalizeToMinute(timestamp) {
+      let date = new Date(timestamp);
+      date.setSeconds(0, 0);
+      return date.getTime();
     }
 
-    // Aggregation
-    const skuAgg = {};
-    let totalRuntime = 0, totalDowntime = 0, totalIdle = 0;
-    let actualProduction = 0, goodProduction = 0, plannedProduction = 0, plannedTime = 0;
+    async function fetchTelemetry(date) {
+      let start = new Date(date + "T00:00:00").getTime();
+      let end = new Date(date + "T23:59:59").getTime();
+      const url = `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee,deltaquality&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
 
-    let sumPerf = 0, cntPerf = 0;
-    let sumAvail = 0, cntAvail = 0;
-    let sumOee = 0, cntOee = 0;
-    let sumQuality = 0, cntQuality = 0;
+      const response = await fetch(url, {
+        headers: { "X-Authorization": `Bearer ${token}` }
+      });
 
-    opRows.forEach(r => {
-      const sku = (r.SKU || 'UNSPECIFIED').trim();
-      const ms = safeNum(r.Machine_Speed);
-      const rt = safeNum(r.Runtime);
-      const dt = safeNum(r.Downtime);
-      const it = safeNum(r.Idletime);
+      if (!response.ok) throw new Error(`Failed to fetch telemetry: ${response.statusText}`);
+      return await response.json();
+    }
 
-      if (!skuAgg[sku]) skuAgg[sku] = { production: 0, runtime: 0, downtime: 0, idletime: 0 };
-      skuAgg[sku].production += Number.isFinite(ms) ? ms : 0;
-      skuAgg[sku].runtime += Number.isFinite(rt) ? rt : 0;
-      skuAgg[sku].downtime += Number.isFinite(dt) ? dt : 0;
-      skuAgg[sku].idletime += Number.isFinite(it) ? it : 0;
+    datePicker.addEventListener("change", async () => {
+      let date = datePicker.value;
+      if (!date) return;
 
-      totalRuntime += Number.isFinite(rt) ? rt : 0;
-      totalDowntime += Number.isFinite(dt) ? dt : 0;
-      totalIdle += Number.isFinite(it) ? it : 0;
+      reportDiv.innerHTML = "Fetching operators...";
+      try {
+        let telemetry = await fetchTelemetry(date);
 
-      actualProduction += Number.isFinite(ms) ? ms : 0;
-      goodProduction += Number.isFinite(safeNum(r.Good_Production)) ? safeNum(r.Good_Production) : 0;
-      plannedProduction = Number.isFinite(safeNum(r.Planned_Production)) ? safeNum(r.Planned_Production) : plannedProduction;
-      plannedTime = Number.isFinite(safeNum(r.Planned_Production_Time)) ? safeNum(r.Planned_Production_Time) : plannedTime;
+        let operatorSet = new Set();
+        if (telemetry.Operator_Name) {
+          telemetry.Operator_Name.forEach(item => operatorSet.add(item.value));
+        }
 
-      const dp = safeNum(r.deltaperformance); if (Number.isFinite(dp)) { sumPerf += dp; cntPerf++; }
-      const da = safeNum(r.deltaavailability); if (Number.isFinite(da)) { sumAvail += da; cntAvail++; }
-      const doee = safeNum(r.deltaoee); if (Number.isFinite(doee)) { sumOee += doee; cntOee++; }
-      const dq = safeNum(r.deltaquality); if (Number.isFinite(dq)) { sumQuality += dq; cntQuality++; }
+        operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
+        operatorSet.forEach(op => {
+          let option = document.createElement("option");
+          option.value = op;
+          option.textContent = op;
+          operatorSelect.appendChild(option);
+        });
+
+        reportDiv.innerHTML = "Operators loaded. Please select one.";
+      } catch (error) {
+        reportDiv.innerHTML = `Error: ${error.message}`;
+      }
     });
 
-    const avgPerf = cntPerf ? (sumPerf / cntPerf) : NaN;
-    const avgAvail = cntAvail ? (sumAvail / cntAvail) : NaN;
-    const avgOee = cntOee ? (sumOee / cntOee) : NaN;
-    const avgQuality = cntQuality ? (sumQuality / cntQuality) : (actualProduction ? (goodProduction / actualProduction * 100) : NaN);
+    document.getElementById("generateBtn").addEventListener("click", async () => {
+      let date = datePicker.value;
+      let operator = operatorSelect.value;
+      if (!date || !operator) {
+        reportDiv.innerHTML = "Please select a date and an operator.";
+        return;
+      }
 
-    // Build output
-    let html = '';
+      reportDiv.innerHTML = `Generating report for ${operator} on ${date}...`;
+      try {
+        let telemetry = await fetchTelemetry(date);
 
-    // SKU Table
-    html += `<div class="card"><h3>Production Details (SKU-wise)</h3>`;
-    html += `<table><thead><tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th></tr></thead><tbody>`;
-    for (const sku of Object.keys(skuAgg)) {
-      const d = skuAgg[sku];
-      html += `<tr>
-        <td>${sku}</td>
-        <td>${Number(d.production).toFixed(2)}</td>
-        <td>${(Number(d.runtime) / 60).toFixed(2)}</td>
-        <td>${(Number(d.downtime) / 60).toFixed(2)}</td>
-        <td>${(Number(d.idletime) / 60).toFixed(2)}</td>
-      </tr>`;
-    }
-    html += `</tbody></table></div>`;
+        // Group telemetry data by minute
+        let groupedData = {};
+        const keys = [
+          "SKU","Operator_Name","Downtime_Submit","Downtime_Duration",
+          "Downtime_Reason_Code","Machine_Speed","Standard_Speed",
+          "Runtime","Downtime","Idletime",
+          "deltaperformance","deltaavailability","deltaoee","deltaquality"
+        ];
 
-    // Machine Performance Summary
-    html += `<div class="card"><h3>3. Machine Performance Summary</h3>
-      <table>
-        <thead>
-          <tr><th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>${Number.isFinite(avgOee) ? avgOee.toFixed(2)+'%' : '--'}</td>
-            <td>${Number.isFinite(avgPerf) ? avgPerf.toFixed(2)+'%' : '--'}</td>
-            <td>${Number.isFinite(avgAvail) ? avgAvail.toFixed(2)+'%' : '--'}</td>
-            <td>${Number.isFinite(avgQuality) ? avgQuality.toFixed(2)+'%' : '--'}</td>
-          </tr>
-        </tbody>
-      </table>
-      <table style="margin-top:10px;">
-        <thead>
-          <tr>
-            <th>Performance</th><th>Availability</th><th>Quality</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Planned Production: ${Number.isFinite(plannedProduction) ? plannedProduction.toFixed(0) : '--'}</td>
-            <td>Planned Production Time: ${Number.isFinite(plannedTime) ? plannedTime.toFixed(0) : '--'} min</td>
-            <td>Actual Production: ${actualProduction.toFixed(0)}</td>
-          </tr>
-          <tr>
-            <td>Actual Production: ${actualProduction.toFixed(0)}</td>
-            <td>Runtime: ${(totalRuntime).toFixed(0)} min</td>
-            <td>Good Production: ${goodProduction.toFixed(0)}</td>
-          </tr>
-          <tr>
-            <td></td>
-            <td>Downtime: ${(totalDowntime).toFixed(0)} min</td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>`;
+        keys.forEach(key => {
+          if (!telemetry[key]) return;
+          telemetry[key].forEach(entry => {
+            let minute = normalizeToMinute(entry.ts);
+            if (!groupedData[minute]) groupedData[minute] = {};
+            groupedData[minute][key] = entry.value;
+          });
+        });
 
-    reportOutput.innerHTML = html;
-    debugOutput.style.display = 'block';
-    debugOutput.textContent = `Rows processed: ${opRows.length}`;
-    setStatus('Report ready');
-  } catch (err) {
-    showError(err.message || String(err));
-    setStatus('');
-    console.error(err);
-  }
-}
+        // Filter only records for the selected operator
+        let operatorData = Object.entries(groupedData)
+          .filter(([_, data]) => data.Operator_Name === operator)
+          .map(([minute, data]) => ({
+            time: new Date(parseInt(minute)).toLocaleTimeString(),
+            ...data
+          }));
 
-/* ---------- Event listeners ---------- */
-datePicker.addEventListener('change', () => {
-  setStatus('');
-  showError('');
-  const date = datePicker.value;
-  if (date) loadOperators(date);
-});
-btnGenerate.addEventListener('click', generateReport);
+        // ===== Production Details (SKU-wise) =====
+        let productionMap = {};
+        operatorData.forEach(d => {
+          let sku = d.SKU || "Unknown";
+          if (!productionMap[sku]) {
+            productionMap[sku] = { production: 0, runtime: 0, downtime: 0 };
+          }
+          productionMap[sku].production += parseFloat(d.Machine_Speed || 0);
+          productionMap[sku].runtime += parseFloat(d.Runtime || 0);
+          productionMap[sku].downtime += parseFloat(d.Downtime || 0);
+        });
 
-/* ---------- Initialize ---------- */
-(function setToday(){
-  const d = new Date();
-  datePicker.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  if (datePicker.value) loadOperators(datePicker.value).catch(()=>{});
-})();
-</script>
+        let productionTable = `
+          <h3>2. Production Details (SKU-wise)</h3>
+          <table>
+            <tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th></tr>
+        `;
+        Object.entries(productionMap).forEach(([sku, values]) => {
+          productionTable += `<tr>
+            <td>${sku}</td>
+            <td>${values.production.toFixed(2)}</td>
+            <td>${(values.runtime / 60).toFixed(2)}</td>
+            <td>${(values.downtime / 60).toFixed(2)}</td>
+          </tr>`;
+        });
+        productionTable += "</table>";
+
+        // ===== Machine Performance Summary =====
+        const avgPerformance = (operatorData.reduce((sum, d) => sum + (parseFloat(d.deltaperformance || 0)), 0) / operatorData.length) || 0;
+        const avgAvailability = (operatorData.reduce((sum, d) => sum + (parseFloat(d.deltaavailability || 0)), 0) / operatorData.length) || 0;
+        const avgOEE = (operatorData.reduce((sum, d) => sum + (parseFloat(d.deltaoee || 0)), 0) / operatorData.length) || 0;
+        const avgQuality = (operatorData.reduce((sum, d) => sum + (parseFloat(d.deltaquality || 0)), 0) / operatorData.length) || 0;
+
+        let totalPlanned = operatorData.reduce((sum, d) => sum + (parseFloat(d.Standard_Speed || 0)), 0);
+        let actualProduction = operatorData.reduce((sum, d) => sum + (parseFloat(d.Machine_Speed || 0)), 0);
+        let runtimeTotal = operatorData.reduce((sum, d) => sum + (parseFloat(d.Runtime || 0)), 0);
+        let downtimeTotal = operatorData.reduce((sum, d) => sum + (parseFloat(d.Downtime || 0)), 0);
+
+        let performanceTable = `
+          <h3>3. Machine Performance Summary</h3>
+          <table>
+            <tr>
+              <th>OEE</th>
+              <th>Performance</th>
+              <th>Availability</th>
+              <th>Quality</th>
+            </tr>
+            <tr>
+              <td>${avgOEE.toFixed(2)}%</td>
+              <td>${avgPerformance.toFixed(2)}%</td>
+              <td>${avgAvailability.toFixed(2)}%</td>
+              <td>${avgQuality.toFixed(2)}%</td>
+            </tr>
+          </table>
+          <table>
+            <tr>
+              <th>Planned Production</th>
+              <th>Planned Production Time (min)</th>
+              <th>Actual Production</th>
+              <th>Runtime (min)</th>
+              <th>Good Production</th>
+              <th>Downtime (min)</th>
+            </tr>
+            <tr>
+              <td>${totalPlanned.toFixed(2)}</td>
+              <td>${runtimeTotal + downtimeTotal}</td>
+              <td>${actualProduction.toFixed(2)}</td>
+              <td>${runtimeTotal.toFixed(2)}</td>
+              <td>${actualProduction.toFixed(2)}</td>
+              <td>${downtimeTotal.toFixed(2)}</td>
+            </tr>
+          </table>
+        `;
+
+        reportDiv.innerHTML = productionTable + performanceTable;
+      } catch (error) {
+        reportDiv.innerHTML = `Error generating report: ${error.message}`;
+      }
+    });
+  </script>
 </body>
 </html>
