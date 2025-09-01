@@ -7,6 +7,9 @@
     h2 { color: #333; }
     select, input, button { padding: 8px; margin: 10px; font-size: 14px; }
     pre { background: #f4f4f4; padding: 10px; border-radius: 5px; max-height: 500px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #f2f2f2; }
   </style>
 </head>
 <body>
@@ -22,57 +25,47 @@
 
   <button id="generateBtn">Generate Report</button>
 
-  <pre id="output"></pre>
+  <div id="report"></div>
 
   <script>
-    // Device ID and token from URL
     const deviceId = "991cf500-661a-11f0-90f1-775fee303094";
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
 
     const datePicker = document.getElementById("datePicker");
     const operatorSelect = document.getElementById("operatorSelect");
-    const output = document.getElementById("output");
+    const reportDiv = document.getElementById("report");
 
-    // Normalize timestamp to minute
     function normalizeToMinute(timestamp) {
       let date = new Date(timestamp);
       date.setSeconds(0, 0);
       return date.getTime();
     }
 
-    // Fetch telemetry from ThingsBoard API
     async function fetchTelemetry(date) {
       let start = new Date(date + "T00:00:00").getTime();
       let end = new Date(date + "T23:59:59").getTime();
-      const url = `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee,deltaquality&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
+      const url = `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
 
       const response = await fetch(url, {
         headers: { "X-Authorization": `Bearer ${token}` }
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch telemetry: ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error(`Failed to fetch telemetry: ${response.statusText}`);
       return await response.json();
     }
 
-    // Populate operator dropdown based on selected date
+    // Load operators when date is selected
     datePicker.addEventListener("change", async () => {
-      let date = datePicker.value;
+      const date = datePicker.value;
       if (!date) return;
-
-      output.textContent = "Fetching operators...";
+      reportDiv.innerHTML = "<p>Fetching operators...</p>";
       try {
-        let telemetry = await fetchTelemetry(date);
-
+        const telemetry = await fetchTelemetry(date);
         let operatorSet = new Set();
         if (telemetry.Operator_Name) {
-          telemetry.Operator_Name.forEach(item => {
-            operatorSet.add(item.value);
-          });
+          telemetry.Operator_Name.forEach(item => operatorSet.add(item.value));
         }
-
         operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
         operatorSet.forEach(op => {
           let option = document.createElement("option");
@@ -80,35 +73,29 @@
           option.textContent = op;
           operatorSelect.appendChild(option);
         });
-
-        output.textContent = "Operators loaded. Please select one.";
+        reportDiv.innerHTML = "<p>Operators loaded. Select an operator and click Generate Report.</p>";
       } catch (error) {
-        output.textContent = `Error: ${error.message}`;
+        reportDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
       }
     });
 
-    // Generate report for selected operator
+    // Generate report
     document.getElementById("generateBtn").addEventListener("click", async () => {
-      let date = datePicker.value;
-      let operator = operatorSelect.value;
+      const date = datePicker.value;
+      const operator = operatorSelect.value;
       if (!date || !operator) {
-        output.textContent = "Please select a date and an operator.";
+        reportDiv.innerHTML = "<p style='color:red;'>Please select both a date and an operator.</p>";
         return;
       }
 
-      output.textContent = `Generating report for ${operator} on ${date}...`;
+      reportDiv.innerHTML = `<p>Generating report for ${operator} on ${date}...</p>`;
+
       try {
-        let telemetry = await fetchTelemetry(date);
+        const telemetry = await fetchTelemetry(date);
 
-        // Group telemetry by minute
+        // Group by minute
         let groupedData = {};
-        const keys = [
-          "SKU","Operator_Name","Downtime_Submit","Downtime_Duration",
-          "Downtime_Reason_Code","Machine_Speed","Standard_Speed",
-          "Runtime","Downtime","Idletime",
-          "deltaperformance","deltaavailability","deltaoee","deltaquality"
-        ];
-
+        const keys = ["SKU", "Operator_Name", "Machine_Speed", "Runtime", "Downtime"];
         keys.forEach(key => {
           if (!telemetry[key]) return;
           telemetry[key].forEach(entry => {
@@ -118,17 +105,57 @@
           });
         });
 
-        // Filter only records for the selected operator
-        let operatorData = Object.entries(groupedData)
+        // Filter for selected operator
+        let filteredData = Object.entries(groupedData)
           .filter(([minute, data]) => data.Operator_Name === operator)
           .map(([minute, data]) => ({
             time: new Date(parseInt(minute)).toLocaleTimeString(),
-            ...data
+            SKU: data.SKU || "N/A",
+            Machine_Speed: parseFloat(data.Machine_Speed || 0),
+            Runtime: parseFloat(data.Runtime || 0),
+            Downtime: parseFloat(data.Downtime || 0)
           }));
 
-        output.textContent = JSON.stringify(operatorData, null, 2);
+        // Aggregate by SKU
+        let skuSummary = {};
+        filteredData.forEach(row => {
+          if (!skuSummary[row.SKU]) {
+            skuSummary[row.SKU] = { production: 0, runtime: 0, downtime: 0 };
+          }
+          skuSummary[row.SKU].production += row.Machine_Speed;
+          skuSummary[row.SKU].runtime += row.Runtime;
+          skuSummary[row.SKU].downtime += row.Downtime;
+        });
+
+        // Create table
+        let tableHTML = `
+          <h3>Production Details (SKU-wise)</h3>
+          <table>
+            <tr>
+              <th>SKU</th>
+              <th>Production (Units)</th>
+              <th>Runtime (hrs)</th>
+              <th>Downtime (hrs)</th>
+            </tr>
+        `;
+
+        for (let sku in skuSummary) {
+          let data = skuSummary[sku];
+          tableHTML += `
+            <tr>
+              <td>${sku}</td>
+              <td>${data.production.toFixed(2)}</td>
+              <td>${(data.runtime / 3600).toFixed(2)}</td>
+              <td>${(data.downtime / 3600).toFixed(2)}</td>
+            </tr>
+          `;
+        }
+
+        tableHTML += `</table>`;
+        reportDiv.innerHTML = tableHTML;
+
       } catch (error) {
-        output.textContent = `Error generating report: ${error.message}`;
+        reportDiv.innerHTML = `<p style="color:red;">Error generating report: ${error.message}</p>`;
       }
     });
   </script>
