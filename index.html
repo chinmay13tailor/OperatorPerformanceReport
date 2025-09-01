@@ -42,7 +42,7 @@
       let start = new Date(date + "T00:00:00").getTime();
       let end = new Date(date + "T23:59:59").getTime();
       const response = await fetch(
-        `https://demo.thingsboard.io/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=Operator_Name,SKU,Runtime,Downtime,Machine_Speed,Standard_Speed&startTs=${start}&endTs=${end}`,
+        `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=Operator_Name,SKU,Runtime,Downtime,Machine_Speed,Standard_Speed&startTs=${start}&endTs=${end}`,
         {
           headers: { "X-Authorization": `Bearer ${token}` }
         }
