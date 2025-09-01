@@ -1,166 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Operator Performance Report</title>
-  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operator Name Fetch</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
-      background-color: #f4f6f8;
+      padding: 20px;
+      background: #f7f7f7;
     }
     h1 {
       color: #333;
-      text-align: center;
     }
-    .controls {
-      display: flex;
-      justify-content: center;
-      margin: 20px 0;
-      gap: 10px;
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      max-width: 500px;
+      margin: auto;
     }
     input, button {
       padding: 10px;
-      font-size: 14px;
-    }
-    #report {
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      max-width: 1000px;
-      margin: 0 auto;
-    }
-    table {
+      margin: 5px 0;
+      font-size: 16px;
       width: 100%;
-      border-collapse: collapse;
+    }
+    #result {
       margin-top: 20px;
-    }
-    table th, table td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
-    }
-    table th {
-      background: #eaeaea;
+      padding: 10px;
+      background: #eef;
+      border-radius: 8px;
+      min-height: 50px;
     }
   </style>
 </head>
 <body>
-  <h1>Operator Performance Report</h1>
-  <div class="controls">
-    <input type="date" id="reportDate" />
-    <button onclick="generateReport()">Generate Report</button>
-  </div>
+  <div class="container">
+    <h1>Fetch Operator Name</h1>
+    <label for="dateInput">Select Date:</label>
+    <input type="date" id="dateInput" />
+    <button onclick="fetchOperator()">Generate1</button>
 
-  <div id="report">
-    <p style="text-align:center; color:#666;">Select a date and click <b>Generate Report</b> to see details here.</p>
+    <div id="result">Operator Name will appear here...</div>
   </div>
 
   <script>
-    // === 1. Parse token from URL ===
-    const urlParams = new URLSearchParams(window.location.search);
-    const TOKEN = urlParams.get('token');
+    const qs = new URLSearchParams(location.search);
+    const TOKEN = qs.get("token") || "";
     const DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
-    const API_URL = `https://your-thingsboard-instance.com/api/plugins/telemetry/DEVICE/${DEVICE_ID}/values/timeseries`;
+    const API_BASE_URL = "https://plantwiz.pimateck.in/api";
+    const KEYS = "Operator_Name";
 
-    // === 2. Generate Report ===
-    async function generateReport() {
-      const date = document.getElementById("reportDate").value;
-      if (!date) {
-        alert("Please select a date first.");
-        return;
-      }
-      if (!TOKEN) {
-        alert("No API token found in the URL. Please provide a valid token.");
+    async function fetchOperator() {
+      const dateInput = document.getElementById("dateInput").value;
+      if (!dateInput) {
+        alert("Please select a date first!");
         return;
       }
 
-      const startTime = new Date(`${date}T00:00:00`).getTime();
-      const endTime = new Date(`${date}T23:59:59`).getTime();
+      // Convert date to start and end timestamps (00:00:00 to 23:59:59)
+      const startTs = new Date(dateInput + "T00:00:00").getTime();
+      const endTs = new Date(dateInput + "T23:59:59").getTime();
+
+      const url = `${API_BASE_URL}/plugins/telemetry/DEVICE/${DEVICE_ID}/values/timeseries?keys=${KEYS}&startTs=${startTs}&endTs=${endTs}&limit=5000&agg=NONE`;
 
       try {
-        const response = await axios.get(
-          `${API_URL}?keys=SKU_Name,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee&startTs=${startTime}&endTs=${endTime}`,
-          {
-            headers: { 'X-Authorization': `Bearer ${TOKEN}` }
+        const res = await fetch(url, {
+          headers: {
+            "X-Authorization": `Bearer ${TOKEN}`
           }
-        );
+        });
 
-        console.log("Raw API Data:", response.data);
+        if (!res.ok) throw new Error("API request failed: " + res.status);
 
-        const parsedData = transformData(response.data);
-        buildReport(parsedData);
+        const data = await res.json();
+        console.log(data);
+
+        const operatorData = data.Operator_Name ? data.Operator_Name.map(d => d.value) : [];
+        const uniqueNames = [...new Set(operatorData)];
+
+        document.getElementById("result").innerHTML = uniqueNames.length > 0
+          ? `Operators: <strong>${uniqueNames.join(", ")}</strong>`
+          : "No operator data found for this date.";
 
       } catch (err) {
         console.error(err);
-        alert("Error fetching data from ThingsBoard API. Check console for details.");
+        document.getElementById("result").innerHTML = "Error fetching data. Check the token or device ID.";
       }
-    }
-
-    // === 3. Transform API Data ===
-    function transformData(apiData) {
-      // Transform logic placeholder - implement custom parsing here
-      return {
-        machinePerformance: {
-          oee: 78.5,
-          performance: 80,
-          availability: 76,
-          quality: 98
-        },
-        productionDetails: [
-          { sku: "SKU-A", production: 1200, runtime: 3.5, downtime: 0.5 },
-          { sku: "SKU-B", production: 950, runtime: 3.0, downtime: 0.8 },
-          { sku: "SKU-C", production: 1500, runtime: 4.0, downtime: 0.2 }
-        ]
-      };
-    }
-
-    // === 4. Build the report table ===
-    function buildReport(data) {
-      let reportHTML = `
-        <h2>Machine Performance</h2>
-        <table>
-          <tr>
-            <th>OEE (%)</th>
-            <th>Performance (%)</th>
-            <th>Availability (%)</th>
-            <th>Quality (%)</th>
-          </tr>
-          <tr>
-            <td>${data.machinePerformance.oee}</td>
-            <td>${data.machinePerformance.performance}</td>
-            <td>${data.machinePerformance.availability}</td>
-            <td>${data.machinePerformance.quality}</td>
-          </tr>
-        </table>
-
-        <h2>Production Details (SKU-wise)</h2>
-        <table>
-          <tr>
-            <th>SKU Name</th>
-            <th>Production (Units)</th>
-            <th>Runtime (hrs)</th>
-            <th>Downtime (hrs)</th>
-          </tr>
-      `;
-
-      data.productionDetails.forEach(row => {
-        reportHTML += `
-          <tr>
-            <td>${row.sku}</td>
-            <td>${row.production}</td>
-            <td>${row.runtime}</td>
-            <td>${row.downtime}</td>
-          </tr>
-        `;
-      });
-
-      reportHTML += `</table>`;
-
-      document.getElementById("report").innerHTML = reportHTML;
     }
   </script>
 </body>
