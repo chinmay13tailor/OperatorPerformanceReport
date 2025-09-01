@@ -45,7 +45,7 @@
     async function fetchTelemetry(date) {
       let start = new Date(date + "T00:00:00").getTime();
       let end = new Date(date + "T23:59:59").getTime();
-      const url = `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
+      const url = `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee,deltaquality&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
 
       const response = await fetch(url, {
         headers: { "X-Authorization": `Bearer ${token}` }
@@ -106,7 +106,7 @@
           "SKU","Operator_Name","Downtime_Submit","Downtime_Duration",
           "Downtime_Reason_Code","Machine_Speed","Standard_Speed",
           "Runtime","Downtime","Idletime",
-          "deltaperformance","deltaavailability","deltaoee"
+          "deltaperformance","deltaavailability","deltaoee","deltaquality"
         ];
 
         keys.forEach(key => {
