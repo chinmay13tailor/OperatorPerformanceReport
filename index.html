@@ -1,292 +1,222 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Operator Performance Report</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; padding: 18px; background:#f7fafc; color:#111; }
-    h2 { margin: 0 0 12px; }
-    .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
-    input[type="date"], select { padding:8px 10px; border-radius:6px; border:1px solid #d1d5db; }
-    button { padding:9px 12px; background:#2563eb; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600; }
-    button:disabled { opacity:.6; cursor:not-allowed; }
-    .card { background: #fff; padding:14px; border-radius:10px; border:1px solid #e6e9ef; margin-bottom:14px; }
-    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
-    th, td { padding:8px; border:1px solid #e6e9ef; text-align:center; }
-    th { background:#f8fafc; font-weight:700; }
-    .muted { color:#6b7280; font-size:13px; }
-    .small { font-size:12px; color:#6b7280; }
-    pre { background:#f3f4f6; padding:8px; border-radius:6px; overflow:auto; max-height:180px; }
-    .error { color:#991b1b; background:#fff1f2; padding:8px; border-radius:6px; border:1px solid #fecaca; margin-top:8px; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2, h3 { text-align: center; margin: 20px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    table, th, td {
+      border: 1px solid black;
+    }
+    th {
+      background-color: #555;
+      color: white;
+      padding: 8px;
+    }
+    td {
+      padding: 8px;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
+    .controls input, .controls select, .controls button {
+      padding: 8px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
   <h2>Operator Performance Report</h2>
 
   <div class="controls">
-    <label for="datePicker">Date</label>
-    <input id="datePicker" type="date" />
-    <label for="operatorSelect">Operator</label>
-    <select id="operatorSelect"><option value="">-- Select Operator --</option></select>
-    <button id="generateBtn">Generate</button>
-    <div id="status" class="small muted" style="margin-left:12px"></div>
+    <input type="date" id="dateInput">
+    <select id="operatorSelect">
+      <option value="">Select Operator</option>
+    </select>
+    <button id="generateBtn">Generate Report</button>
   </div>
 
-  <div id="errorBox" style="display:none" class="error"></div>
+  <div id="reportContent">
+    <!-- Production Details Table -->
+    <h3>2. Production Details (SKU-wise)</h3>
+    <table id="skuTable">
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Production (Units)</th>
+          <th>Runtime (hrs)</th>
+          <th>Downtime (hrs)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
 
-  <div id="reportOutput"></div>
-  <pre id="debugOutput" style="display:none"></pre>
+    <!-- Machine Performance Summary -->
+    <h3>3. Machine Performance Summary</h3>
+    <table id="machineSummaryTop">
+      <thead>
+        <tr>
+          <th>OEE</th>
+          <th>Performance</th>
+          <th>Availability</th>
+          <th>Quality</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td id="oeeCell">-</td>
+          <td id="performanceCell">-</td>
+          <td id="availabilityCell">-</td>
+          <td id="qualityCell">-</td>
+        </tr>
+      </tbody>
+    </table>
 
-<script>
-/* ---------- Configuration ---------- */
-const DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
-const API_BASE = "https://plantwiz.pimateck.in/api";
-const qs = new URLSearchParams(window.location.search);
-const TOKEN = qs.get('token') || "";
+    <table id="machineSummaryBottom">
+      <thead>
+        <tr>
+          <th>Performance</th>
+          <th>Availability</th>
+          <th>Quality</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td id="plannedProduction">Planned Production: -</td>
+          <td id="plannedTime">Planned Production Time: -</td>
+          <td id="actualProduction">Actual Production: -</td>
+        </tr>
+        <tr>
+          <td id="actualProductionPerf">Actual Production: -</td>
+          <td id="runtime">Runtime: -</td>
+          <td id="goodProduction">Good Production: -</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td id="downtime">Downtime: -</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
-/* ---------- DOM ---------- */
-const datePicker = document.getElementById('datePicker');
-const operatorSelect = document.getElementById('operatorSelect');
-const btnGenerate = document.getElementById('generateBtn');
-const status = document.getElementById('status');
-const reportOutput = document.getElementById('reportOutput');
-const errorBox = document.getElementById('errorBox');
-const debugOutput = document.getElementById('debugOutput');
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const deviceId = '991cf500-661a-11f0-90f1-775fee303094';
+    const apiUrl = `https://demo.thingsboard.io/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries`;
 
-/* ---------- Helpers ---------- */
-function showError(msg) {
-  if (!msg) { errorBox.style.display = 'none'; errorBox.textContent = ''; return; }
-  errorBox.style.display = 'block';
-  errorBox.textContent = msg;
-}
-function setStatus(txt) { status.textContent = txt || ''; }
-function safeNum(v) {
-  if (v === undefined || v === null) return NaN;
-  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', ''));
-  return Number.isFinite(n) ? n : NaN;
-}
-function normalizeToMinute(ts) {
-  const d = new Date(+ts);
-  d.setSeconds(0, 0);
-  return d.getTime();
-}
+    const dateInput = document.getElementById('dateInput');
+    const operatorSelect = document.getElementById('operatorSelect');
+    const generateBtn = document.getElementById('generateBtn');
 
-/* ---------- Telemetry keys ---------- */
-/* include deltaquality here as requested */
-const KEYS_LIST = [
-  "SKU","Operator_Name","Downtime_Submit","Downtime_Duration","Downtime_Reason_Code",
-  "Machine_Speed","Standard_Speed","Runtime","Downtime","Idletime",
-  "deltaperformance","deltaavailability","deltaoee","deltaquality",
-  "Good_Production","Planned_Production","Planned_Production_Time"
-];
-const KEYS_PARAM = KEYS_LIST.join(',');
+    let fetchedData = [];
 
-/* ---------- Fetch timeseries from ThingsBoard ---------- */
-async function fetchTelemetryForDate(dateStr) {
-  if (!TOKEN) throw new Error("Missing token in URL (?token=YOUR_JWT)");
-  const start = new Date(dateStr + "T00:00:00").getTime();
-  const end   = new Date(dateStr + "T23:59:59").getTime();
-  const url = `${API_BASE}/plugins/telemetry/DEVICE/${DEVICE_ID}/values/timeseries?keys=${encodeURIComponent(KEYS_PARAM)}&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
-  const res = await fetch(url, { headers: { "X-Authorization": `Bearer ${TOKEN}` } });
-  if (!res.ok) {
-    const txt = await res.text().catch(()=>res.statusText);
-    throw new Error(`Telemetry fetch failed: ${res.status} ${txt}`);
-  }
-  return res.json(); // object { key: [{ts, value}, ...], ... }
-}
+    // Fetch operator list when date is selected
+    dateInput.addEventListener('change', async () => {
+      const date = dateInput.value;
+      if (!date) return;
 
-/* ---------- Build rows aligned by minute ---------- */
-function buildRowsFromTimeseries(tsObj) {
-  const map = new Map();
-  Object.entries(tsObj || {}).forEach(([key, arr])=>{
-    (arr || []).forEach(p=>{
-      const minute = normalizeToMinute(p.ts);
-      const row = map.get(minute) || { ts: minute };
-      row[key] = p.value;
-      map.set(minute, row);
-    });
-  });
-  return Array.from(map.values()).sort((a,b)=>a.ts-b.ts);
-}
+      const startTime = new Date(`${date}T00:00:00`).getTime();
+      const endTime = new Date(`${date}T23:59:59`).getTime();
 
-/* ---------- UI: load operators for selected date ---------- */
-async function loadOperators(dateStr) {
-  try {
-    showError('');
-    setStatus('Loading operators…');
-    operatorSelect.innerHTML = '<option value="">Loading…</option>';
-    const ts = await fetchTelemetryForDate(dateStr);
-    const ops = (ts.Operator_Name || []).map(x => String(x.value).trim()).filter(s => s);
-    const unique = [...new Set(ops)];
-    operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
-    unique.forEach(op => operatorSelect.appendChild(new Option(op, op)));
-    setStatus(unique.length ? `Found ${unique.length} operator(s)` : 'No operators found');
-  } catch (err) {
-    operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
-    showError(err.message || String(err));
-    setStatus('');
-    console.error(err);
-  }
-}
+      const keys = "SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee,deltaquality";
+      const response = await fetch(`${apiUrl}?keys=${keys}&startTs=${startTime}&endTs=${endTime}&limit=10000`, {
+        headers: { 'X-Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
 
-/* ---------- Main generate logic: compute SKU summary + averaged deltas ---------- */
-async function generateReport() {
-  showError('');
-  reportOutput.innerHTML = '';
-  debugOutput.style.display = 'none';
-  const dateStr = datePicker.value;
-  const operator = operatorSelect.value;
-  if (!dateStr) { showError('Please select a date.'); return; }
-  if (!operator) { showError('Please select an operator.'); return; }
-  try {
-    setStatus('Fetching telemetry and computing report…');
-    const ts = await fetchTelemetryForDate(dateStr);
-    const rows = buildRowsFromTimeseries(ts);
-    // filter rows for selected operator (match string trimmed)
-    const opRows = rows.filter(r => {
-      const v = r.Operator_Name === undefined || r.Operator_Name === null ? '' : String(r.Operator_Name).trim();
-      return v === operator;
-    });
+      // Group by timestamp minute
+      fetchedData = [];
+      Object.keys(data).forEach(key => {
+        data[key].forEach(entry => {
+          const tsMinute = Math.floor(entry.ts / 60000) * 60000;
+          let record = fetchedData.find(r => r.ts === tsMinute);
+          if (!record) {
+            record = { ts: tsMinute };
+            fetchedData.push(record);
+          }
+          record[key] = entry.value;
+        });
+      });
 
-    if (opRows.length === 0) {
-      reportOutput.innerHTML = `<div class="card"><div class="muted">No records found for ${operator} on ${dateStr}.</div></div>`;
-      setStatus('');
-      return;
-    }
-
-    // SKU aggregation: production (sum Machine_Speed), runtime, downtime, idletime
-    const skuAgg = {};
-    let totalRuntime = 0, totalDowntime = 0, totalIdle = 0;
-    let actualProduction = 0, goodProduction = 0, plannedProduction = 0, plannedTime = 0;
-
-    // sums & counts for deltas
-    let sumPerf = 0, cntPerf = 0;
-    let sumAvail = 0, cntAvail = 0;
-    let sumOee = 0, cntOee = 0;
-    let sumQualityDelta = 0, cntQualityDelta = 0;
-
-    opRows.forEach(r => {
-      const sku = (r.SKU && String(r.SKU).trim()) || 'UNSPECIFIED';
-      const ms = safeNum(r.Machine_Speed);
-      const rt = safeNum(r.Runtime);
-      const dt = safeNum(r.Downtime);
-      const it = safeNum(r.Idletime);
-
-      if (!skuAgg[sku]) skuAgg[sku] = { production: 0, runtime: 0, downtime: 0, idletime: 0 };
-      skuAgg[sku].production += Number.isFinite(ms) ? ms : 0;
-      skuAgg[sku].runtime += Number.isFinite(rt) ? rt : 0;
-      skuAgg[sku].downtime += Number.isFinite(dt) ? dt : 0;
-      skuAgg[sku].idletime += Number.isFinite(it) ? it : 0;
-
-      totalRuntime += Number.isFinite(rt) ? rt : 0;
-      totalDowntime += Number.isFinite(dt) ? dt : 0;
-      totalIdle += Number.isFinite(it) ? it : 0;
-
-      actualProduction += Number.isFinite(ms) ? ms : 0;
-      goodProduction += Number.isFinite(safeNum(r.Good_Production)) ? safeNum(r.Good_Production) : 0;
-      plannedProduction = Number.isFinite(safeNum(r.Planned_Production)) ? safeNum(r.Planned_Production) : plannedProduction;
-      plannedTime = Number.isFinite(safeNum(r.Planned_Production_Time)) ? safeNum(r.Planned_Production_Time) : plannedTime;
-
-      // delta averages accumulation
-      const dp = safeNum(r.deltaperformance); if (Number.isFinite(dp)) { sumPerf += dp; cntPerf++; }
-      const da = safeNum(r.deltaavailability);  if (Number.isFinite(da)) { sumAvail += da; cntAvail++; }
-      const doee = safeNum(r.deltaoee);        if (Number.isFinite(doee)) { sumOee += doee; cntOee++; }
-      const dq = safeNum(r.deltaquality);      if (Number.isFinite(dq)) { sumQualityDelta += dq; cntQualityDelta++; }
+      // Populate operator dropdown
+      const operators = [...new Set(fetchedData.map(d => d.Operator_Name).filter(Boolean))];
+      operatorSelect.innerHTML = '<option value="">Select Operator</option>';
+      operators.forEach(op => {
+        const opt = document.createElement('option');
+        opt.value = op;
+        opt.textContent = op;
+        operatorSelect.appendChild(opt);
+      });
     });
 
-    // compute averages (guard against division by zero)
-    const avgPerf = cntPerf ? (sumPerf / cntPerf) : NaN;
-    const avgAvail = cntAvail ? (sumAvail / cntAvail) : NaN;
-    const avgOee = cntOee ? (sumOee / cntOee) : NaN;
-    const avgQualityDelta = cntQualityDelta ? (sumQualityDelta / cntQualityDelta) : NaN;
+    // Generate report
+    generateBtn.addEventListener('click', () => {
+      const operator = operatorSelect.value;
+      if (!operator) {
+        alert('Please select an operator');
+        return;
+      }
 
-    // compute quality fallback (good/actual)
-    const computedQualityPct = actualProduction ? (goodProduction / actualProduction * 100) : NaN;
-    const displayQuality = Number.isFinite(avgQualityDelta) ? avgQualityDelta : computedQualityPct;
+      const operatorData = fetchedData.filter(d => d.Operator_Name === operator);
 
-    // Build HTML output
-    let html = '';
+      // Build SKU table
+      const skuData = {};
+      operatorData.forEach(row => {
+        const sku = row.SKU || 'Unknown';
+        if (!skuData[sku]) {
+          skuData[sku] = { production: 0, runtime: 0, downtime: 0 };
+        }
+        skuData[sku].production += parseFloat(row.Machine_Speed || 0);
+        skuData[sku].runtime += parseFloat(row.Runtime || 0);
+        skuData[sku].downtime += parseFloat(row.Downtime || 0);
+      });
 
-    // SKU table
-    html += `<div class="card"><h3>Production Details (SKU-wise)</h3>`;
-    html += `<table><thead><tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th></tr></thead><tbody>`;
-    for (const sku of Object.keys(skuAgg)) {
-      const d = skuAgg[sku];
-      html += `<tr>
-        <td>${sku}</td>
-        <td>${Number(d.production).toFixed(2)}</td>
-        <td>${(Number(d.runtime) / 60).toFixed(2)}</td>
-        <td>${(Number(d.downtime) / 60).toFixed(2)}</td>
-        <td>${(Number(d.idletime) / 60).toFixed(2)}</td>
-      </tr>`;
-    }
-    html += `</tbody></table></div>`;
+      const skuTableBody = document.querySelector('#skuTable tbody');
+      skuTableBody.innerHTML = '';
+      Object.keys(skuData).forEach(sku => {
+        const { production, runtime, downtime } = skuData[sku];
+        const row = `<tr>
+          <td>${sku}</td>
+          <td>${production}</td>
+          <td>${(runtime/60).toFixed(1)}</td>
+          <td>${(downtime/60).toFixed(1)}</td>
+        </tr>`;
+        skuTableBody.innerHTML += row;
+      });
 
-    // Machine Performance Summary
-    html += `<div class="card"><h3>Machine Performance Summary</h3>`;
-    html += `<table><thead><tr><th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th></tr></thead><tbody>`;
-    html += `<tr>
-      <td>${Number.isFinite(avgOee) ? avgOee.toFixed(2) + '%' : '--'}</td>
-      <td>${Number.isFinite(avgPerf) ? avgPerf.toFixed(2) + '%' : '--'}</td>
-      <td>${Number.isFinite(avgAvail) ? avgAvail.toFixed(2) + '%' : '--'}</td>
-      <td>${Number.isFinite(displayQuality) ? Number(displayQuality).toFixed(2) + '%' : '--'}</td>
-    </tr></tbody></table>`;
+      // Machine Performance Summary
+      const avg = (key) => {
+        const values = operatorData.map(d => parseFloat(d[key] || 0));
+        return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(0) : '-';
+      };
 
-    // Details row (planned/actual/runtime/good/downtime)
-    html += `<table style="margin-top:10px;"><thead><tr>
-      <th>Planned Production</th><th>Planned Production Time (min)</th><th>Actual Production</th>
-      <th>Runtime (hrs)</th><th>Good Production</th><th>Downtime (hrs)</th>
-    </tr></thead><tbody>`;
-    html += `<tr>
-      <td>${Number.isFinite(plannedProduction) ? plannedProduction.toFixed(0) : '--'}</td>
-      <td>${Number.isFinite(plannedTime) ? plannedTime.toFixed(0) : '--'}</td>
-      <td>${actualProduction.toFixed(0)}</td>
-      <td>${(totalRuntime / 60).toFixed(2)}</td>
-      <td>${goodProduction.toFixed(0)}</td>
-      <td>${(totalDowntime / 60).toFixed(2)}</td>
-    </tr></tbody></table></div>`;
+      document.getElementById('oeeCell').textContent = avg('deltaoee') + '%';
+      document.getElementById('performanceCell').textContent = avg('deltaperformance') + '%';
+      document.getElementById('availabilityCell').textContent = avg('deltaavailability') + '%';
+      document.getElementById('qualityCell').textContent = avg('deltaquality') + '%';
 
-    reportOutput.innerHTML = html;
-
-    // Small debug info (counts used for averages)
-    debugOutput.style.display = 'block';
-    debugOutput.textContent = `Averages computed from counts:
-deltaperformance → count=${cntPerf}
-deltaavailability → count=${cntAvail}
-deltaoee → count=${cntOee}
-deltaquality → count=${cntQualityDelta}`;
-    setStatus(`Report ready — rows used: ${opRows.length}`);
-  } catch (err) {
-    showError(err.message || String(err));
-    setStatus('');
-    console.error(err);
-  }
-}
-
-/* ---------- Wiring ---------- */
-datePicker.addEventListener('change', () => {
-  setStatus('');
-  showError('');
-  const date = datePicker.value;
-  if (!date) return;
-  // load operators
-  loadOperators(date);
-});
-
-// Generate button
-btnGenerate.addEventListener('click', generateReport);
-
-// set default date today
-(function setToday(){
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const day = String(d.getDate()).padStart(2,'0');
-  datePicker.value = `${y}-${m}-${day}`;
-  // auto-load operators for today if token present
-  if (datePicker.value) loadOperators(datePicker.value).catch(()=>{});
-})();
-</script>
+      // Placeholder for bottom table values
+      document.getElementById('plannedProduction').textContent = `Planned Production: ${operatorData.length * 100}`;
+      document.getElementById('plannedTime').textContent = `Planned Production Time: ${operatorData.length * 10} min`;
+      document.getElementById('actualProduction').textContent = `Actual Production: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Machine_Speed || 0)), 0)}`;
+      document.getElementById('actualProductionPerf').textContent = `Actual Production: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Machine_Speed || 0)), 0)}`;
+      document.getElementById('runtime').textContent = `Runtime: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Runtime || 0)), 0)} min`;
+      document.getElementById('goodProduction').textContent = `Good Production: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Machine_Speed || 0)), 0)}`;
+      document.getElementById('downtime').textContent = `Downtime: ${operatorData.reduce((sum, r) => sum + (parseFloat(r.Downtime || 0)), 0)} min`;
+    });
+  </script>
 </body>
 </html>
