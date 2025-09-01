@@ -4,14 +4,17 @@
   <title>Operator Performance Report</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
-    select, input, button { padding: 8px; margin: 10px; }
+    h2 { color: #333; }
+    select, input, button { padding: 8px; margin: 10px; font-size: 14px; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 5px; max-height: 500px; overflow: auto; }
   </style>
 </head>
 <body>
   <h2>Operator Performance Report</h2>
-  <label for="date">Select Date:</label>
-  <input type="date" id="datePicker">
   
+  <label for="datePicker">Select Date:</label>
+  <input type="date" id="datePicker">
+
   <label for="operatorSelect">Select Operator:</label>
   <select id="operatorSelect">
     <option value="">-- Select Operator --</option>
@@ -22,6 +25,7 @@
   <pre id="output"></pre>
 
   <script>
+    // Device ID and token from URL
     const deviceId = "991cf500-661a-11f0-90f1-775fee303094";
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
@@ -37,44 +41,50 @@
       return date.getTime();
     }
 
-    // Fetch telemetry for the selected date
+    // Fetch telemetry from ThingsBoard API
     async function fetchTelemetry(date) {
       let start = new Date(date + "T00:00:00").getTime();
       let end = new Date(date + "T23:59:59").getTime();
-      const response = await fetch(
-        `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=Operator_Name,SKU,Runtime,Downtime,Machine_Speed,Standard_Speed&startTs=${start}&endTs=${end}`,
-        {
-          headers: { "X-Authorization": `Bearer ${token}` }
-        }
-      );
+      const url = `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
+
+      const response = await fetch(url, {
+        headers: { "X-Authorization": `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch telemetry: ${response.statusText}`);
+      }
       return await response.json();
     }
 
-    // Populate operator dropdown after date selection
+    // Populate operator dropdown based on selected date
     datePicker.addEventListener("change", async () => {
       let date = datePicker.value;
       if (!date) return;
-      
+
       output.textContent = "Fetching operators...";
-      let telemetry = await fetchTelemetry(date);
+      try {
+        let telemetry = await fetchTelemetry(date);
 
-      let operatorSet = new Set();
-      if (telemetry.Operator_Name) {
-        telemetry.Operator_Name.forEach(item => {
-          let normalizedTime = normalizeToMinute(item.ts);
-          operatorSet.add(item.value);
+        let operatorSet = new Set();
+        if (telemetry.Operator_Name) {
+          telemetry.Operator_Name.forEach(item => {
+            operatorSet.add(item.value);
+          });
+        }
+
+        operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
+        operatorSet.forEach(op => {
+          let option = document.createElement("option");
+          option.value = op;
+          option.textContent = op;
+          operatorSelect.appendChild(option);
         });
+
+        output.textContent = "Operators loaded. Please select one.";
+      } catch (error) {
+        output.textContent = `Error: ${error.message}`;
       }
-
-      operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
-      operatorSet.forEach(op => {
-        let option = document.createElement("option");
-        option.value = op;
-        option.textContent = op;
-        operatorSelect.appendChild(option);
-      });
-
-      output.textContent = "Operators loaded. Please select one.";
     });
 
     // Generate report for selected operator
@@ -87,25 +97,39 @@
       }
 
       output.textContent = `Generating report for ${operator} on ${date}...`;
-      let telemetry = await fetchTelemetry(date);
+      try {
+        let telemetry = await fetchTelemetry(date);
 
-      // Group telemetry by minute
-      let groupedData = {};
-      ["SKU","Runtime","Downtime","Machine_Speed","Standard_Speed","Operator_Name"].forEach(key => {
-        if (!telemetry[key]) return;
-        telemetry[key].forEach(entry => {
-          let minute = normalizeToMinute(entry.ts);
-          if (!groupedData[minute]) groupedData[minute] = {};
-          groupedData[minute][key] = entry.value;
+        // Group telemetry by minute
+        let groupedData = {};
+        const keys = [
+          "SKU","Operator_Name","Downtime_Submit","Downtime_Duration",
+          "Downtime_Reason_Code","Machine_Speed","Standard_Speed",
+          "Runtime","Downtime","Idletime",
+          "deltaperformance","deltaavailability","deltaoee"
+        ];
+
+        keys.forEach(key => {
+          if (!telemetry[key]) return;
+          telemetry[key].forEach(entry => {
+            let minute = normalizeToMinute(entry.ts);
+            if (!groupedData[minute]) groupedData[minute] = {};
+            groupedData[minute][key] = entry.value;
+          });
         });
-      });
 
-      // Filter by operator
-      let operatorData = Object.entries(groupedData)
-        .filter(([minute, data]) => data.Operator_Name === operator)
-        .map(([minute, data]) => ({ time: new Date(parseInt(minute)).toLocaleTimeString(), ...data }));
+        // Filter only records for the selected operator
+        let operatorData = Object.entries(groupedData)
+          .filter(([minute, data]) => data.Operator_Name === operator)
+          .map(([minute, data]) => ({
+            time: new Date(parseInt(minute)).toLocaleTimeString(),
+            ...data
+          }));
 
-      output.textContent = JSON.stringify(operatorData, null, 2);
+        output.textContent = JSON.stringify(operatorData, null, 2);
+      } catch (error) {
+        output.textContent = `Error generating report: ${error.message}`;
+      }
     });
   </script>
 </body>
