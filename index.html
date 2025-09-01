@@ -48,7 +48,7 @@
     async function fetchTelemetry(date) {
       let start = new Date(date + "T00:00:00").getTime();
       let end = new Date(date + "T23:59:59").getTime();
-      const url = `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
+      const url = `https://plantwiz.pimateck.in/api/plugins/telemetry/DEVICE/${deviceId}/values/timeseries?keys=SKU,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee,Good_Production,Planned_Production,Planned_Production_Time&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
 
       const response = await fetch(url, {
         headers: { "X-Authorization": `Bearer ${token}` }
@@ -104,7 +104,8 @@
           "SKU", "Operator_Name", "Downtime_Submit", "Downtime_Duration",
           "Downtime_Reason_Code", "Machine_Speed", "Standard_Speed",
           "Runtime", "Downtime", "Idletime",
-          "deltaperformance", "deltaavailability", "deltaoee"
+          "deltaperformance", "deltaavailability", "deltaoee",
+          "Good_Production", "Planned_Production", "Planned_Production_Time"
         ];
 
         keys.forEach(key => {
@@ -126,6 +127,10 @@
 
         // Aggregate SKU-wise data
         let skuSummary = {};
+        let oee = 0, performance = 0, availability = 0, quality = 0;
+        let plannedProduction = 0, plannedTime = 0, actualProduction = 0, goodProduction = 0;
+        let totalRuntime = 0, totalDowntime = 0;
+
         operatorData.forEach(row => {
           let sku = row.SKU || "Unknown";
           if (!skuSummary[sku]) {
@@ -135,9 +140,25 @@
           skuSummary[sku].runtime += row.Runtime ? parseFloat(row.Runtime) : 0;
           skuSummary[sku].downtime += row.Downtime ? parseFloat(row.Downtime) : 0;
           skuSummary[sku].idletime += row.Idletime ? parseFloat(row.Idletime) : 0;
+
+          // OEE KPIs (taking the last recorded value for simplicity)
+          if (row.deltaperformance) performance = parseFloat(row.deltaperformance);
+          if (row.deltaavailability) availability = parseFloat(row.deltaavailability);
+          if (row.deltaoee) oee = parseFloat(row.deltaoee);
+
+          // Production details
+          if (row.Planned_Production) plannedProduction = parseFloat(row.Planned_Production);
+          if (row.Planned_Production_Time) plannedTime = parseFloat(row.Planned_Production_Time);
+          if (row.Machine_Speed) actualProduction += parseFloat(row.Machine_Speed);
+          if (row.Good_Production) goodProduction += parseFloat(row.Good_Production);
+
+          totalRuntime += row.Runtime ? parseFloat(row.Runtime) : 0;
+          totalDowntime += row.Downtime ? parseFloat(row.Downtime) : 0;
         });
 
-        // Generate HTML table
+        quality = actualProduction > 0 ? ((goodProduction / actualProduction) * 100) : 0;
+
+        // Build SKU-wise table
         let tableHTML = `
           <h3>Production Details (SKU-wise)</h3>
           <table>
@@ -164,8 +185,45 @@
         }
 
         tableHTML += `</table>`;
-        reportOutput.innerHTML = tableHTML;
 
+        // Build Machine Performance Summary table
+        tableHTML += `
+          <h3>Machine Performance Summary</h3>
+          <table>
+            <tr>
+              <th>OEE</th>
+              <th>Performance</th>
+              <th>Availability</th>
+              <th>Quality</th>
+            </tr>
+            <tr>
+              <td>${oee.toFixed(2)}%</td>
+              <td>${performance.toFixed(2)}%</td>
+              <td>${availability.toFixed(2)}%</td>
+              <td>${quality.toFixed(2)}%</td>
+            </tr>
+          </table>
+          <table>
+            <tr>
+              <th>Planned Production</th>
+              <th>Planned Production Time (min)</th>
+              <th>Actual Production</th>
+              <th>Runtime (hrs)</th>
+              <th>Good Production</th>
+              <th>Downtime (hrs)</th>
+            </tr>
+            <tr>
+              <td>${plannedProduction.toFixed(0)}</td>
+              <td>${plannedTime.toFixed(0)}</td>
+              <td>${actualProduction.toFixed(0)}</td>
+              <td>${(totalRuntime / 60).toFixed(2)}</td>
+              <td>${goodProduction.toFixed(0)}</td>
+              <td>${(totalDowntime / 60).toFixed(2)}</td>
+            </tr>
+          </table>
+        `;
+
+        reportOutput.innerHTML = tableHTML;
         debugOutput.textContent = "Report generated successfully.";
       } catch (error) {
         debugOutput.textContent = `Error generating report: ${error.message}`;
