@@ -7,9 +7,10 @@
     h2 { color: #333; }
     select, input, button { padding: 8px; margin: 10px; font-size: 14px; }
     pre { background: #f4f4f4; padding: 10px; border-radius: 5px; max-height: 500px; overflow: auto; }
-    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-    table, th, td { border: 1px solid #ccc; text-align: center; padding: 8px; }
-    th { background: #f0f0f0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 8px; text-align: center; }
+    th { background: #f2f2f2; }
   </style>
 </head>
 <body>
@@ -51,7 +52,9 @@
         headers: { "X-Authorization": `Bearer ${token}` }
       });
 
-      if (!response.ok) throw new Error(`Failed to fetch telemetry: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch telemetry: ${response.statusText}`);
+      }
       return await response.json();
     }
 
@@ -59,10 +62,9 @@
       let date = datePicker.value;
       if (!date) return;
 
-      reportDiv.innerHTML = "Fetching operators...";
+      reportDiv.textContent = "Fetching operators...";
       try {
         let telemetry = await fetchTelemetry(date);
-
         let operatorSet = new Set();
         if (telemetry.Operator_Name) {
           telemetry.Operator_Name.forEach(item => operatorSet.add(item.value));
@@ -76,9 +78,9 @@
           operatorSelect.appendChild(option);
         });
 
-        reportDiv.innerHTML = "Operators loaded. Please select one.";
+        reportDiv.textContent = "Operators loaded. Please select one.";
       } catch (error) {
-        reportDiv.innerHTML = `Error: ${error.message}`;
+        reportDiv.textContent = `Error: ${error.message}`;
       }
     });
 
@@ -86,15 +88,14 @@
       let date = datePicker.value;
       let operator = operatorSelect.value;
       if (!date || !operator) {
-        reportDiv.innerHTML = "Please select a date and an operator.";
+        reportDiv.textContent = "Please select a date and an operator.";
         return;
       }
 
-      reportDiv.innerHTML = `Generating report for ${operator} on ${date}...`;
+      reportDiv.textContent = `Generating report for ${operator} on ${date}...`;
       try {
         let telemetry = await fetchTelemetry(date);
 
-        // Group telemetry data by minute
         let groupedData = {};
         const keys = [
           "SKU","Operator_Name","Downtime_Submit","Downtime_Duration",
@@ -112,60 +113,51 @@
           });
         });
 
-        // Filter only records for the selected operator
         let operatorData = Object.entries(groupedData)
-          .filter(([_, data]) => data.Operator_Name === operator)
+          .filter(([minute, data]) => data.Operator_Name === operator)
           .map(([minute, data]) => ({
             time: new Date(parseInt(minute)).toLocaleTimeString(),
             ...data
           }));
 
-        // ===== Production Details (SKU-wise) =====
-        let productionMap = {};
-        operatorData.forEach(d => {
-          let sku = d.SKU || "Unknown";
-          if (!productionMap[sku]) {
-            productionMap[sku] = { production: 0, runtime: 0, downtime: 0 };
-          }
-          productionMap[sku].production += parseFloat(d.Machine_Speed || 0);
-          productionMap[sku].runtime += parseFloat(d.Runtime || 0);
-          productionMap[sku].downtime += parseFloat(d.Downtime || 0);
+        // --- Table 1: Production Details (SKU-wise) ---
+        let skuSummary = {};
+        operatorData.forEach(record => {
+          let sku = record.SKU || "Unknown";
+          if (!skuSummary[sku]) skuSummary[sku] = { production: 0, runtime: 0, downtime: 0 };
+          skuSummary[sku].production += Number(record.Machine_Speed || 0);
+          skuSummary[sku].runtime += Number(record.Runtime || 0);
+          skuSummary[sku].downtime += Number(record.Downtime || 0);
         });
 
-        let productionTable = `
-          <h3>2. Production Details (SKU-wise)</h3>
+        let productionTable = `<h3>Production Details (SKU-wise)</h3>
           <table>
-            <tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th></tr>
-        `;
-        Object.entries(productionMap).forEach(([sku, values]) => {
+            <tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th></tr>`;
+        Object.entries(skuSummary).forEach(([sku, data]) => {
           productionTable += `<tr>
             <td>${sku}</td>
-            <td>${values.production.toFixed(2)}</td>
-            <td>${(values.runtime / 60).toFixed(2)}</td>
-            <td>${(values.downtime / 60).toFixed(2)}</td>
+            <td>${data.production}</td>
+            <td>${(data.runtime/60).toFixed(2)}</td>
+            <td>${(data.downtime/60).toFixed(2)}</td>
           </tr>`;
         });
-        productionTable += "</table>";
+        productionTable += `</table>`;
 
-        // ===== Machine Performance Summary =====
-        const avgPerformance = (operatorData.reduce((sum, d) => sum + (parseFloat(d.deltaperformance || 0)), 0) / operatorData.length) || 0;
-        const avgAvailability = (operatorData.reduce((sum, d) => sum + (parseFloat(d.deltaavailability || 0)), 0) / operatorData.length) || 0;
-        const avgOEE = (operatorData.reduce((sum, d) => sum + (parseFloat(d.deltaoee || 0)), 0) / operatorData.length) || 0;
-        const avgQuality = (operatorData.reduce((sum, d) => sum + (parseFloat(d.deltaquality || 0)), 0) / operatorData.length) || 0;
+        // --- Table 2: Machine Performance Summary ---
+        let avgPerformance = (operatorData.reduce((a, b) => a + Number(b.deltaperformance || 0), 0) / operatorData.length) || 0;
+        let avgAvailability = (operatorData.reduce((a, b) => a + Number(b.deltaavailability || 0), 0) / operatorData.length) || 0;
+        let avgOEE = (operatorData.reduce((a, b) => a + Number(b.deltaoee || 0), 0) / operatorData.length) || 0;
+        let avgQuality = (operatorData.reduce((a, b) => a + Number(b.deltaquality || 0), 0) / operatorData.length) || 0;
 
-        let totalPlanned = operatorData.reduce((sum, d) => sum + (parseFloat(d.Standard_Speed || 0)), 0);
-        let actualProduction = operatorData.reduce((sum, d) => sum + (parseFloat(d.Machine_Speed || 0)), 0);
-        let runtimeTotal = operatorData.reduce((sum, d) => sum + (parseFloat(d.Runtime || 0)), 0);
-        let downtimeTotal = operatorData.reduce((sum, d) => sum + (parseFloat(d.Downtime || 0)), 0);
+        let plannedProduction = operatorData.reduce((sum, record) => sum + Number(record.Standard_Speed || 0), 0);
+        let actualProduction = operatorData.reduce((sum, record) => sum + Number(record.Machine_Speed || 0), 0);
+        let runtime = operatorData.reduce((sum, record) => sum + Number(record.Runtime || 0), 0);
+        let downtime = operatorData.reduce((sum, record) => sum + Number(record.Downtime || 0), 0);
 
-        let performanceTable = `
-          <h3>3. Machine Performance Summary</h3>
+        let performanceTable = `<h3>Machine Performance Summary</h3>
           <table>
             <tr>
-              <th>OEE</th>
-              <th>Performance</th>
-              <th>Availability</th>
-              <th>Quality</th>
+              <th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th>
             </tr>
             <tr>
               <td>${avgOEE.toFixed(2)}%</td>
@@ -174,29 +166,27 @@
               <td>${avgQuality.toFixed(2)}%</td>
             </tr>
           </table>
+          <br/>
           <table>
             <tr>
-              <th>Planned Production</th>
-              <th>Planned Production Time (min)</th>
-              <th>Actual Production</th>
-              <th>Runtime (min)</th>
-              <th>Good Production</th>
-              <th>Downtime (min)</th>
+              <th>Planned Production</th><th>Planned Production Time (min)</th>
+              <th>Actual Production</th><th>Runtime (min)</th>
+              <th>Good Production</th><th>Downtime (min)</th>
             </tr>
             <tr>
-              <td>${totalPlanned.toFixed(2)}</td>
-              <td>${runtimeTotal + downtimeTotal}</td>
-              <td>${actualProduction.toFixed(2)}</td>
-              <td>${runtimeTotal.toFixed(2)}</td>
-              <td>${actualProduction.toFixed(2)}</td>
-              <td>${downtimeTotal.toFixed(2)}</td>
+              <td>${plannedProduction}</td>
+              <td>${runtime + downtime}</td>
+              <td>${actualProduction}</td>
+              <td>${runtime}</td>
+              <td>${actualProduction}</td>
+              <td>${downtime}</td>
             </tr>
-          </table>
-        `;
+          </table>`;
 
         reportDiv.innerHTML = productionTable + performanceTable;
+
       } catch (error) {
-        reportDiv.innerHTML = `Error generating report: ${error.message}`;
+        reportDiv.textContent = `Error generating report: ${error.message}`;
       }
     });
   </script>
