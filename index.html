@@ -1,114 +1,165 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Operator Machine Performance Report</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Operator Performance Report</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <script src="https://cdn.plot.ly/plotly-2.31.1.min.js"></script>
   <style>
-    body { background: #f8f9fa; padding: 20px; }
-    .card { margin-bottom: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    .section-title { font-weight: bold; font-size: 1.2rem; color: #333; margin-bottom: 10px; }
-    table th { background-color: #007bff; color: white; text-align: center; }
-    table td { text-align: center; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f4f6f8;
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+      gap: 10px;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 14px;
+    }
+    #report {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table th, table td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    table th {
+      background: #eaeaea;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2 class="text-center mb-4">Operator Machine Performance Report</h2>
+  <h1>Operator Performance Report</h1>
+  <div class="controls">
+    <input type="date" id="reportDate" />
+    <button onclick="generateReport()">Generate Report</button>
+  </div>
 
-    <!-- Date Selector -->
-    <div class="card p-3 mb-4">
-      <label for="reportDate" class="form-label">Select Date:</label>
-      <input type="date" id="reportDate" class="form-control mb-2">
-      <button class="btn btn-primary" onclick="generateReport()">Generate Report</button>
-    </div>
-
-    <!-- Report Sections -->
-    <div id="reportContent">
-      <!-- Sections dynamically inserted -->
-    </div>
+  <div id="report">
+    <p style="text-align:center; color:#666;">Select a date and click <b>Generate Report</b> to see details here.</p>
   </div>
 
   <script>
-    const API_URL = "https://example.com/api/data"; // Replace with real API
+    // === 1. Parse token from URL ===
+    const urlParams = new URLSearchParams(window.location.search);
+    const TOKEN = urlParams.get('token');
+    const API_URL = "https://your-thingsboard-instance.com/api/plugins/telemetry/DEVICE/your-device-id/values/timeseries";
 
+    // === 2. Main function to generate report ===
     async function generateReport() {
       const date = document.getElementById("reportDate").value;
-      if (!date) return alert("Please select a date first.");
+      if (!date) {
+        alert("Please select a date first.");
+        return;
+      }
+      if (!TOKEN) {
+        alert("No API token found in the URL. Please provide a valid token.");
+        return;
+      }
+
+      const startTime = new Date(`${date}T00:00:00`).getTime();
+      const endTime = new Date(`${date}T23:59:59`).getTime();
 
       try {
-        const response = await axios.get(`${API_URL}?date=${date}`);
-        const data = response.data; // API returns telemetry for that day
+        const response = await axios.get(
+          `${API_URL}?keys=SKU_Name,Operator_Name,Downtime_Submit,Downtime_Duration,Downtime_Reason_Code,Machine_Speed,Standard_Speed,Runtime,Downtime,Idletime,deltaperformance,deltaavailability,deltaoee&startTs=${startTime}&endTs=${endTime}`,
+          {
+            headers: { 'X-Authorization': `Bearer ${TOKEN}` }
+          }
+        );
 
-        buildReport(data);
+        console.log("Raw API Data:", response.data);
+
+        const parsedData = transformData(response.data);
+        buildReport(parsedData);
+
       } catch (err) {
         console.error(err);
-        alert("Error fetching data from API.");
+        alert("Error fetching data from ThingsBoard API. Check console for details.");
       }
     }
 
-    function buildReport(data) {
-      const container = document.getElementById("reportContent");
-      container.innerHTML = "";
-
-      // Section 1: Operator Overview
-      container.innerHTML += `
-        <div class="card p-3">
-          <div class="section-title">1. Operator Overview</div>
-          <p><strong>Operator Name:</strong> ${data.operator || 'N/A'}</p>
-          <p><strong>Machine Assigned:</strong> ${data.machine || 'N/A'}</p>
-          <p><strong>Shift / Line:</strong> ${data.shift || 'N/A'}</p>
-        </div>
-      `;
-
-      // Section 2: Production Details (SKU-wise)
-      let skuRows = data.production.map(sku => `
-        <tr>
-          <td>${sku.SKU}</td>
-          <td>${sku.productionUnits}</td>
-          <td>${sku.runtime}</td>
-          <td>${sku.downtime}</td>
-        </tr>
-      `).join('');
-
-      container.innerHTML += `
-        <div class="card p-3">
-          <div class="section-title">2. Production Details (SKU-wise)</div>
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>SKU Name</th>
-                <th>Production (Units)</th>
-                <th>Runtime (hrs)</th>
-                <th>Downtime (hrs)</th>
-              </tr>
-            </thead>
-            <tbody>${skuRows}</tbody>
-          </table>
-        </div>
-      `;
-
-      // Section 3: OEE and Performance Chart (placeholder)
-      container.innerHTML += `
-        <div class="card p-3">
-          <div class="section-title">3. Machine Performance Summary</div>
-          <div id="oeeChart" style="height:300px;"></div>
-        </div>
-      `;
-      renderOEEChart(data.oee);
+    // === 3. Transform raw API data into structured report data ===
+    function transformData(apiData) {
+      // For now, return dummy structure; implement calculations as needed
+      return {
+        machinePerformance: {
+          oee: 78.5,
+          performance: 80,
+          availability: 76,
+          quality: 98
+        },
+        productionDetails: [
+          { sku: "SKU-A", production: 1200, runtime: 3.5, downtime: 0.5 },
+          { sku: "SKU-B", production: 950, runtime: 3.0, downtime: 0.8 },
+          { sku: "SKU-C", production: 1500, runtime: 4.0, downtime: 0.2 }
+        ]
+      };
     }
 
-    function renderOEEChart(oee) {
-      const trace = {
-        x: ['OEE', 'Performance', 'Availability', 'Quality'],
-        y: [oee.oee, oee.performance, oee.availability, oee.quality],
-        type: 'bar',
-        marker: { color: ['#ff9800','#2196f3','#4caf50','#f44336'] }
-      };
-      Plotly.newPlot('oeeChart', [trace], { margin: { t: 20 } });
+    // === 4. Build the report in HTML ===
+    function buildReport(data) {
+      let reportHTML = `
+        <h2>Machine Performance</h2>
+        <table>
+          <tr>
+            <th>OEE (%)</th>
+            <th>Performance (%)</th>
+            <th>Availability (%)</th>
+            <th>Quality (%)</th>
+          </tr>
+          <tr>
+            <td>${data.machinePerformance.oee}</td>
+            <td>${data.machinePerformance.performance}</td>
+            <td>${data.machinePerformance.availability}</td>
+            <td>${data.machinePerformance.quality}</td>
+          </tr>
+        </table>
+
+        <h2>Production Details (SKU-wise)</h2>
+        <table>
+          <tr>
+            <th>SKU Name</th>
+            <th>Production (Units)</th>
+            <th>Runtime (hrs)</th>
+            <th>Downtime (hrs)</th>
+          </tr>
+      `;
+
+      data.productionDetails.forEach(row => {
+        reportHTML += `
+          <tr>
+            <td>${row.sku}</td>
+            <td>${row.production}</td>
+            <td>${row.runtime}</td>
+            <td>${row.downtime}</td>
+          </tr>
+        `;
+      });
+
+      reportHTML += `</table>`;
+
+      document.getElementById("report").innerHTML = reportHTML;
     }
   </script>
 </body>
