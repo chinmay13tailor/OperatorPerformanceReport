@@ -237,14 +237,78 @@
           <td>${(totalDowntime / 60).toFixed(2)}</td>
         </tr></tbody></table></div>`;
 
+        /* --------- STEP 2: Downtime Summary (by Downtime_Reason_Code) --------- */
+        const dtByReason = {};
+        let failures = 0;
+        opRows.forEach(r => {
+          const submit = safeNum(r.Downtime_Submit);
+          if (submit === 1) {
+            const reason = r.Downtime_Reason_Code ? String(r.Downtime_Reason_Code).trim() : 'UNKNOWN';
+            let durMin = safeNum(r.Downtime_Duration);
+            // If your Downtime_Duration is in seconds, convert: durMin = Number.isFinite(durMin) ? durMin/60 : durMin;
+            if (!dtByReason[reason]) dtByReason[reason] = { occ: 0, totalMin: 0, mttrSamples: [] };
+            dtByReason[reason].occ += 1;
+            if (Number.isFinite(durMin)) {
+              dtByReason[reason].totalMin += durMin;
+              dtByReason[reason].mttrSamples.push(durMin);
+            }
+            failures++;
+          }
+        });
+        Object.values(dtByReason).forEach(obj => {
+          obj.mttr = obj.mttrSamples.length ? (obj.mttrSamples.reduce((a,b)=>a+b,0) / obj.mttrSamples.length) : NaN;
+          obj.mtbf = obj.occ ? (totalRuntime / obj.occ) : NaN; // totalRuntime is in minutes
+        });
+        const overallMTTR = failures ? (Object.values(dtByReason).reduce((a,b)=>a+b.totalMin,0) / failures) : NaN;
+        const overallMTBF = (failures && Number.isFinite(totalRuntime)) ? (totalRuntime / failures) : NaN;
+
+        let dtRows = '';
+        Object.entries(dtByReason).forEach(([reason, obj], i) => {
+          const dtId = `D-${String(101 + i).padStart(3, '0')}`;
+          dtRows += `<tr>
+            <td>${dtId}</td>
+            <td>${reason}</td>
+            <td>${Number(obj.totalMin).toFixed(0)}</td>
+            <td>${obj.occ}</td>
+            <td>${Number.isFinite(obj.mtbf) ? Number(obj.mtbf).toFixed(0) : '--'}</td>
+            <td>${Number.isFinite(obj.mttr) ? Number(obj.mttr).toFixed(0) : '--'}</td>
+          </tr>`;
+        });
+
+        html += `
+          <div class="card">
+            <h3>Alarms & Downtimes During Operation</h3>
+            <h4>Downtime Summary</h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Downtime ID</th>
+                  <th>Downtime Reason</th>
+                  <th>Downtime Duration (min)</th>
+                  <th>No. of Times</th>
+                  <th>MTBF (min)</th>
+                  <th>MTTR (min)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${dtRows || '<tr><td colspan="6" class="muted">No downtime events found (Downtime_Submit == 1).</td></tr>'}
+              </tbody>
+            </table>
+            <div class="small muted" style="margin-top:6px">
+              Overall Operator MTBF: ${Number.isFinite(overallMTBF) ? overallMTBF.toFixed(0) : '--'} min
+              &nbsp; | &nbsp;
+              Overall Operator MTTR: ${Number.isFinite(overallMTTR) ? overallMTTR.toFixed(0) : '--'} min
+            </div>
+          </div>`;
+
         reportOutput.innerHTML = html;
 
         debugOutput.style.display = 'block';
         debugOutput.textContent = `Averages computed from counts:
-deltaperformance → count=${cntPerf}
-deltaavailability → count=${cntAvail}
-deltaoee → count=${cntOee}
-deltaquality → count=${cntQualityDelta}`;
+        deltaperformance → count=${cntPerf}
+        deltaavailability → count=${cntAvail}
+        deltaoee → count=${cntOee}
+        deltaquality → count=${cntQualityDelta}`;
 
         setStatus(`Report ready — rows used: ${opRows.length}`);
       } catch (err) {
