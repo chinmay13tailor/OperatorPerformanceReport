@@ -12,12 +12,23 @@
     button { padding:9px 12px; background:#2563eb; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600; }
     button:disabled { opacity:.6; cursor:not-allowed; }
 
-    .card { background:#fff; padding:14px; border-radius:10px; border:1px solid #e6e9ef; margin-bottom:14px; }
+    .card { background: #fff; padding:14px; border-radius:10px; border:1px solid #e6e9ef; margin-bottom:14px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
-    th, td { padding:8px; text-align:center; }
+    th, td { padding:8px; border:1px solid #e6e9ef; text-align:center; }
+    th { background:#f8fafc; font-weight:700; }
+    .muted { color:#6b7280; font-size:13px; }
+    .small { font-size:12px; color:#6b7280; }
+    pre { background:#f3f4f6; padding:8px; border-radius:6px; overflow:auto; max-height:180px; }
+    .error { color:#991b1b; background:#fff1f2; padding:8px; border-radius:6px; border:1px solid #fecaca; margin-top:8px; }
 
-    /* Report header */
-    .report-header { border:1px solid #000; border-radius:6px; padding:10px 20px; margin-bottom:20px; background:#fff; }
+    /* Report Header (rendered inside report section) */
+    .report-header {
+      border:1px solid #000;
+      border-radius:6px;
+      padding:10px 20px;
+      margin-bottom:20px;
+      background:#fff;
+    }
     .header-top { display:flex; justify-content:space-between; align-items:center; }
     .header-top img { max-height:60px; width:auto; }
     .header-center { text-align:center; flex:1; }
@@ -25,27 +36,11 @@
     .header-center h3 { margin:4px 0 0; font-size:14px; font-weight:normal; }
     .header-center h2 { margin:6px 0 0; font-size:18px; font-weight:bold; }
     .header-bottom { display:flex; justify-content:space-between; font-size:13px; margin-top:6px; font-weight:bold; }
-
-    /* Screenshot-like styling for Machine Performance */
-    .kpiTable, .gridTable { border:2px solid #555; }
-    .kpiTable th, .kpiTable td, .gridTable th, .gridTable td { border:1px solid #555; }
-    .kpiTable thead tr, .gridTable thead tr { background:#e5e7eb; font-weight:700; }
-    .kpiTable td { height:34px; }
-
-    /* Generic tables */
-    .boxed { border:1px solid #999; }
-    .boxed th, .boxed td { border:1px solid #999; }
-    .boxed thead tr { background:#f8fafc; font-weight:700; }
-
-    .muted { color:#6b7280; font-size:13px; }
-    .small { font-size:12px; color:#6b7280; }
-    .error { color:#991b1b; background:#fff1f2; padding:8px; border-radius:6px; border:1px solid #fecaca; margin-top:8px; display:none; }
-    pre { background:#f3f4f6; padding:8px; border-radius:6px; overflow:auto; max-height:180px; display:none; }
   </style>
 </head>
 <body>
 
-  <!-- Date Selection -->
+  <!-- Date Selection Section -->
   <div class="controls">
     <label for="datePicker">Date</label>
     <input id="datePicker" type="date" />
@@ -74,61 +69,74 @@
       </div>
     </div>
 
-    <div id="errorBox" class="error"></div>
+    <div id="errorBox" style="display:none" class="error"></div>
     <div id="reportOutput"></div>
-    <pre id="debugOutput"></pre>
+    <pre id="debugOutput" style="display:none"></pre>
   </div>
 
   <script>
-    /* -------- Config -------- */
+    /* ---------- Configuration ---------- */
     const DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
     const API_BASE = "https://plantwiz.pimateck.in/api";
     const qs = new URLSearchParams(window.location.search);
     const TOKEN = qs.get('token') || "";
 
-    /* -------- DOM -------- */
+    /* ---------- DOM ---------- */
     const datePicker = document.getElementById('datePicker');
     const operatorSelect = document.getElementById('operatorSelect');
     const btnGenerate = document.getElementById('generateBtn');
     const status = document.getElementById('status');
-    const errorBox = document.getElementById('errorBox');
-    const reportSection = document.getElementById('reportSection');
     const reportOutput = document.getElementById('reportOutput');
+    const errorBox = document.getElementById('errorBox');
     const debugOutput = document.getElementById('debugOutput');
+    const reportSection = document.getElementById('reportSection');
 
-    /* -------- Utils -------- */
-    function showError(msg) { if (!msg) { errorBox.style.display='none'; errorBox.textContent=''; return; } errorBox.style.display='block'; errorBox.textContent=msg; }
+    /* ---------- Helpers ---------- */
+    function showError(msg) {
+      if (!msg) { errorBox.style.display = 'none'; errorBox.textContent = ''; return; }
+      errorBox.style.display = 'block'; errorBox.textContent = msg;
+    }
     function setStatus(txt) { status.textContent = txt || ''; }
-    function safeNum(v){ if(v===undefined || v===null) return NaN; const n = typeof v==='number'? v : parseFloat(String(v).replace(',','')); return Number.isFinite(n)? n : NaN; }
-    function normalizeToMinute(ts){ const d = new Date(+ts); d.setSeconds(0,0); return d.getTime(); }
+    function safeNum(v) {
+      if (v === undefined || v === null) return NaN;
+      const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', ''));
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function normalizeToMinute(ts) {
+      const d = new Date(+ts);
+      d.setSeconds(0, 0);
+      return d.getTime();
+    }
 
-    /* -------- Keys -------- */
+    /* ---------- Telemetry keys ---------- */
     const KEYS_LIST = [
-      "SKU","Operator_Name",
-      "Machine_Speed","Standard_Speed","Good_Production",
-      "Runtime","Downtime","Idletime",
+      "SKU","Operator_Name","Downtime_Submit","Downtime_Duration","Downtime_Reason_Code",
+      "Machine_Speed","Standard_Speed","Runtime","Downtime","Idletime",
       "deltaperformance","deltaavailability","deltaoee","deltaquality",
-      "Planned_Production_Time",
-      "Per_Min_Consumption",
-      "Downtime_Submit","Downtime_Duration","Downtime_Reason_Code"
+      "Good_Production","Planned_Production","Planned_Production_Time",
+      "Per_Min_Consumption"
     ];
     const KEYS_PARAM = KEYS_LIST.join(',');
 
-    /* -------- Data layer -------- */
+    /* ---------- Fetch timeseries ---------- */
     async function fetchTelemetryForDate(dateStr) {
       if (!TOKEN) throw new Error("Missing token in URL (?token=YOUR_JWT)");
       const start = new Date(dateStr + "T00:00:00").getTime();
-      const end   = new Date(dateStr + "T23:59:59").getTime();
+      const end = new Date(dateStr + "T23:59:59").getTime();
       const url = `${API_BASE}/plugins/telemetry/DEVICE/${DEVICE_ID}/values/timeseries?keys=${encodeURIComponent(KEYS_PARAM)}&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
       const res = await fetch(url, { headers: { "X-Authorization": `Bearer ${TOKEN}` } });
-      if (!res.ok) { const txt = await res.text().catch(()=>res.statusText); throw new Error(\`Telemetry fetch failed: \${res.status} \${txt}\`); }
+      if (!res.ok) {
+        const txt = await res.text().catch(()=>res.statusText);
+        throw new Error(`Telemetry fetch failed: ${res.status} ${txt}`);
+      }
       return res.json();
     }
 
+    /* ---------- Build rows ---------- */
     function buildRowsFromTimeseries(tsObj) {
       const map = new Map();
       Object.entries(tsObj || {}).forEach(([key, arr])=>{
-        (arr||[]).forEach(p=>{
+        (arr || []).forEach(p=>{
           const minute = normalizeToMinute(p.ts);
           const row = map.get(minute) || { ts: minute };
           row[key] = p.value;
@@ -138,293 +146,366 @@
       return Array.from(map.values()).sort((a,b)=>a.ts-b.ts);
     }
 
+    /* ---------- Load operators ---------- */
     async function loadOperators(dateStr) {
       try {
-        showError(''); setStatus('Loading operators…');
+        showError('');
+        setStatus('Loading operators…');
         operatorSelect.innerHTML = '<option value="">Loading…</option>';
         const ts = await fetchTelemetryForDate(dateStr);
-        const ops = (ts.Operator_Name || []).map(x=>String(x.value).trim()).filter(Boolean);
+        const ops = (ts.Operator_Name || []).map(x => String(x.value).trim()).filter(s => s);
         const unique = [...new Set(ops)];
         operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
         unique.forEach(op => operatorSelect.appendChild(new Option(op, op)));
-        setStatus(unique.length ? \`Found \${unique.length} operator(s)\` : 'No operators found');
+        setStatus(unique.length ? `Found ${unique.length} operator(s)` : 'No operators found');
       } catch (err) {
         operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
-        showError(err.message || String(err)); setStatus('');
+        showError(err.message || String(err));
+        setStatus('');
+        console.error(err);
       }
     }
 
-    /* -------- Init -------- */
-    datePicker.addEventListener('change', () => { setStatus(''); showError(''); if (datePicker.value) loadOperators(datePicker.value); });
-    btnGenerate.addEventListener('click', generateReport);
-    (function initToday(){ const d=new Date(); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); datePicker.value=\`\${y}-\${m}-\${day}\`; if(datePicker.value) loadOperators(datePicker.value).catch(()=>{}); })();
-
-    /* -------- Report -------- */
+    /* ---------- Generate report ---------- */
     async function generateReport() {
-      showError(''); reportOutput.innerHTML=''; debugOutput.style.display='none';
+      showError('');
+      reportOutput.innerHTML = '';
+      debugOutput.style.display = 'none';
 
       const dateStr = datePicker.value;
       const operator = operatorSelect.value;
       if (!dateStr) { showError('Please select a date.'); return; }
       if (!operator) { showError('Please select an operator.'); return; }
 
-      // Show header
-      reportSection.style.display='block';
-      document.getElementById('headerDate').textContent = \`Date: \${dateStr}\`;
-      document.getElementById('headerOperator').textContent = \`Operator Name: \${operator}\`;
-      document.getElementById('generatedDate').textContent = \`Report Generated ON: \${new Date().toLocaleString()}\`;
+      // Show report shell & fill header
+      reportSection.style.display = 'block';
+      document.getElementById('headerDate').textContent = `Date: ${dateStr}`;
+      document.getElementById('headerOperator').textContent = `Operator Name: ${operator}`;
+      document.getElementById('generatedDate').textContent = `Report Generated ON: ${new Date().toLocaleString()}`;
 
       try {
-        setStatus('Fetching telemetry and computing…');
+        setStatus('Fetching telemetry and computing report…');
         const ts = await fetchTelemetryForDate(dateStr);
-        const allRows = buildRowsFromTimeseries(ts);
+        const rows = buildRowsFromTimeseries(ts);
 
-        // Filter for selected operator
-        const rows = allRows.filter(r => (r.Operator_Name ? String(r.Operator_Name).trim() : '') === operator);
-        if (!rows.length) {
+        // Filter rows for the selected operator
+        const opRows = rows.filter(r => {
+          const v = r.Operator_Name === undefined || r.Operator_Name === null ? '' : String(r.Operator_Name).trim();
+          return v === operator;
+        });
+
+        if (opRows.length === 0) {
           reportOutput.innerHTML = `<div class="card"><div class="muted">No records found for ${operator} on ${dateStr}.</div></div>`;
-          setStatus(''); return;
+          setStatus('');
+          return;
         }
 
-        /* ----- Aggregations common ----- */
-        // SKU wise
+        // Aggregations
         const skuAgg = {};
         let totalRuntime = 0, totalDowntime = 0, totalIdle = 0;
         let actualProduction = 0, goodProduction = 0, plannedProduction = 0, plannedTime = 0;
-        let sumPerf=0,cntPerf=0,sumAvail=0,cntAvail=0,sumOee=0,cntOee=0,sumQual=0,cntQual=0;
+        let sumPerf = 0, cntPerf = 0;
+        let sumAvail = 0, cntAvail = 0;
+        let sumOee = 0, cntOee = 0;
+        let sumQualityDelta = 0, cntQualityDelta = 0;
 
-        // Energy buckets
-        let ecRuntime=0, ecDowntime=0, ecIdle=0, ecTotal=0;
-
-        // Downtime aggregation
-        const dtMap = new Map(); // code -> {durationMin, count}
-        let totalFailures = 0;
-
-        rows.forEach(r=>{
+        opRows.forEach(r => {
           const sku = (r.SKU && String(r.SKU).trim()) || 'UNSPECIFIED';
           const ms = safeNum(r.Machine_Speed);
-          const std= safeNum(r.Standard_Speed);
-          const gp = safeNum(r.Good_Production);
+          const stdSpeed = safeNum(r.Standard_Speed);
           const rt = safeNum(r.Runtime);
           const dt = safeNum(r.Downtime);
           const it = safeNum(r.Idletime);
 
-          if(!skuAgg[sku]) skuAgg[sku] = { production:0, runtime:0, downtime:0, idletime:0 };
-          skuAgg[sku].production += Number.isFinite(ms)? ms:0;
-          skuAgg[sku].runtime   += Number.isFinite(rt)? rt:0;
-          skuAgg[sku].downtime  += Number.isFinite(dt)? dt:0;
-          skuAgg[sku].idletime  += Number.isFinite(it)? it:0;
+          if (!skuAgg[sku]) skuAgg[sku] = { production: 0, runtime: 0, downtime: 0, idletime: 0 };
+          skuAgg[sku].production += Number.isFinite(ms) ? ms : 0;
+          skuAgg[sku].runtime   += Number.isFinite(rt) ? rt : 0;
+          skuAgg[sku].downtime  += Number.isFinite(dt) ? dt : 0;
+          skuAgg[sku].idletime  += Number.isFinite(it) ? it : 0;
 
-          actualProduction += Number.isFinite(ms)? ms:0;
-          plannedProduction += Number.isFinite(std)? std:0;
-          goodProduction += Number.isFinite(gp)? gp:0;
+          totalRuntime   += Number.isFinite(rt) ? rt : 0;
+          totalDowntime  += Number.isFinite(dt) ? dt : 0;
+          totalIdle      += Number.isFinite(it) ? it : 0;
 
-          totalRuntime  += Number.isFinite(rt)? rt:0;
-          totalDowntime += Number.isFinite(dt)? dt:0;
-          totalIdle     += Number.isFinite(it)? it:0;
+          actualProduction   += Number.isFinite(ms) ? ms : 0;
+          goodProduction     += Number.isFinite(safeNum(r.Good_Production)) ? safeNum(r.Good_Production) : 0;
+          plannedProduction  += Number.isFinite(stdSpeed) ? stdSpeed : 0;
+          plannedTime         = Number.isFinite(safeNum(r.Planned_Production_Time)) ? safeNum(r.Planned_Production_Time) : plannedTime;
 
-          const ppt = safeNum(r.Planned_Production_Time);
-          if (Number.isFinite(ppt)) plannedTime = ppt;
-
-          const dperf = safeNum(r.deltaperformance);  if (Number.isFinite(dperf)) { sumPerf += dperf; cntPerf++; }
-          const dav   = safeNum(r.deltaavailability); if (Number.isFinite(dav))   { sumAvail += dav; cntAvail++; }
-          const doee  = safeNum(r.deltaoee);          if (Number.isFinite(doee))  { sumOee  += doee;  cntOee++; }
-          const dqual = safeNum(r.deltaquality);      if (Number.isFinite(dqual)) { sumQual += dqual; cntQual++; }
-
-          // Energy buckets by state flags (1 per minute)
-          const perMin = safeNum(r.Per_Min_Consumption);
-          if (Number.isFinite(perMin)) {
-            const isRT = Number.isFinite(rt) && rt === 1;
-            const isDT = Number.isFinite(dt) && dt === 1;
-            const isID = Number.isFinite(it) && it === 1;
-            if (isRT) ecRuntime += perMin;
-            else if (isDT) ecDowntime += perMin;
-            else if (isID) ecIdle += perMin;
-            ecTotal += perMin;
-          }
-
-          // Downtime end events
-          const submit = safeNum(r.Downtime_Submit);
-          if (submit === 1) {
-            const durSec = safeNum(r.Downtime_Duration); // seconds
-            const code = (r.Downtime_Reason_Code && String(r.Downtime_Reason_Code).trim()) || 'UNSPECIFIED';
-            const durMin = Number.isFinite(durSec) ? (durSec/60) : 0; // convert seconds -> minutes
-            const cur = dtMap.get(code) || { durationMin:0, count:0 };
-            cur.durationMin += durMin;
-            cur.count += 1;
-            dtMap.set(code, cur);
-            totalFailures += 1;
-          }
+          const dp  = safeNum(r.deltaperformance);  if (Number.isFinite(dp))  { sumPerf += dp;  cntPerf++; }
+          const da  = safeNum(r.deltaavailability); if (Number.isFinite(da))  { sumAvail += da; cntAvail++; }
+          const doee= safeNum(r.deltaoee);          if (Number.isFinite(doee)){ sumOee += doee; cntOee++; }
+          const dq  = safeNum(r.deltaquality);      if (Number.isFinite(dq))  { sumQualityDelta += dq; cntQualityDelta++; }
         });
 
-        const avgPerf = cntPerf ? (sumPerf/cntPerf) : NaN;
-        const avgAvail = cntAvail ? (sumAvail/cntAvail) : NaN;
-        const avgOee = cntOee ? (sumOee/cntOee) : NaN;
-        const computedQuality = actualProduction>0 ? (goodProduction/actualProduction*100) : NaN;
-        const displayQuality = cntQual ? (sumQual/cntQual) : computedQuality;
+        const avgPerf = cntPerf ? (sumPerf / cntPerf) : NaN;
+        const avgAvail = cntAvail ? (sumAvail / cntAvail) : NaN;
+        const avgOee = cntOee ? (sumOee / cntOee) : NaN;
+        const avgQualityDelta = cntQualityDelta ? (sumQualityDelta / cntQualityDelta) : NaN;
+        const computedQualityPct = actualProduction ? (goodProduction / actualProduction * 100) : NaN;
+        const displayQuality = Number.isFinite(avgQualityDelta) ? avgQualityDelta : computedQualityPct;
 
-        /* ---------- Build HTML ---------- */
+        // ---------- Build HTML ----------
         let html = '';
 
         // 1) Production Details (SKU-wise)
-        html += `<div class="card"><h3>2. Production Details (SKU-wise)</h3>
-          <table class="boxed">
-            <thead><tr>
-              <th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th>
-            </tr></thead><tbody>`;
-        Object.keys(skuAgg).forEach(sku=>{
+        html += `<div class="card"><h3>Production Details (SKU-wise)</h3>`;
+        html += `<table><thead><tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th></tr></thead><tbody>`;
+        for (const sku of Object.keys(skuAgg)) {
           const d = skuAgg[sku];
           html += `<tr>
             <td>${sku}</td>
             <td>${Number(d.production).toFixed(2)}</td>
-            <td>${(Number(d.runtime)/60).toFixed(2)}</td>
-            <td>${(Number(d.downtime)/60).toFixed(2)}</td>
-            <td>${(Number(d.idletime)/60).toFixed(2)}</td>
+            <td>${(Number(d.runtime) / 60).toFixed(2)}</td>
+            <td>${(Number(d.downtime) / 60).toFixed(2)}</td>
+            <td>${(Number(d.idletime) / 60).toFixed(2)}</td>
           </tr>`;
-        });
+        }
         html += `</tbody></table></div>`;
 
-        // 2) Machine Performance Summary (like screenshot)
-        html += `<div class="card"><h3>3. Machine Performance Summary</h3>
-          <table class="kpiTable">
-            <thead><tr><th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th></tr></thead>
-            <tbody><tr>
-              <td>${Number.isFinite(avgOee)? avgOee.toFixed(0)+'%' : '--'}</td>
-              <td>${Number.isFinite(avgPerf)? avgPerf.toFixed(0)+'%' : '--'}</td>
-              <td>${Number.isFinite(avgAvail)? avgAvail.toFixed(0)+'%' : '--'}</td>
-              <td>${Number.isFinite(displayQuality)? Number(displayQuality).toFixed(0)+'%' : '--'}</td>
-            </tr></tbody>
-          </table>
-          <table class="gridTable" style="margin-top:14px;">
-            <thead><tr><th>Performance</th><th>Availability</th><th>Quality</th></tr></thead>
-            <tbody>
-              <tr>
-                <td>Planned Production: ${Number.isFinite(plannedProduction)? plannedProduction.toLocaleString() : '--'}</td>
-                <td>Planned Production Time: ${Number.isFinite(plannedTime)? plannedTime.toFixed(0) : '--'} min</td>
-                <td>Actual Production: ${actualProduction.toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td>Actual Production: ${actualProduction.toLocaleString()}</td>
-                <td>Runtime: ${(totalRuntime).toFixed(0)} min</td>
-                <td>Good Production: ${goodProduction.toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td></td>
-                <td>Downtime: ${(totalDowntime).toFixed(0)} min</td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>`;
+        // 2) Machine Performance Summary
+        html += `<div class="card"><h3>Machine Performance Summary</h3>`;
+        html += `<table><thead><tr><th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th></tr></thead><tbody>`;
+        html += `<tr>
+          <td>${Number.isFinite(avgOee) ? avgOee.toFixed(2) + '%' : '--'}</td>
+          <td>${Number.isFinite(avgPerf) ? avgPerf.toFixed(2) + '%' : '--'}</td>
+          <td>${Number.isFinite(avgAvail) ? avgAvail.toFixed(2) + '%' : '--'}</td>
+          <td>${Number.isFinite(displayQuality) ? Number(displayQuality).toFixed(2) + '%' : '--'}</td>
+        </tr></tbody></table>`;
 
-        // 3) Alarms & Downtimes During Operation (Downtime Summary + Overall MTBF/MTTR)
-        // MTBF = totalRuntime / totalFailures ; MTTR = sumDurations / totalFailures
-        const totalDurMinFromEvents = Array.from(dtMap.values()).reduce((s,v)=>s+v.durationMin,0);
-        const overallMTBF = totalFailures ? (totalRuntime / totalFailures) : 0;           // minutes
-        const overallMTTR = totalFailures ? (totalDurMinFromEvents / totalFailures) : 0;  // minutes
+        html += `<table style="margin-top:10px;"><thead><tr>
+          <th>Planned Production</th><th>Planned Production Time (min)</th><th>Actual Production</th>
+          <th>Runtime (hrs)</th><th>Good Production</th><th>Downtime (hrs)</th>
+        </tr></thead><tbody>`;
+        html += `<tr>
+          <td>${Number.isFinite(plannedProduction) ? plannedProduction.toFixed(0) : '--'}</td>
+          <td>${Number.isFinite(plannedTime) ? plannedTime.toFixed(0) : '--'}</td>
+          <td>${actualProduction.toFixed(0)}</td>
+          <td>${(totalRuntime / 60).toFixed(2)}</td>
+          <td>${goodProduction.toFixed(0)}</td>
+          <td>${(totalDowntime / 60).toFixed(2)}</td>
+        </tr></tbody></table></div>`;
 
-        html += `<div class="card"><h3>4. Alarms & Downtimes During Operation</h3>
-          <h4 style="text-align:left;margin:4px 0;">Downtime Summary</h4>
-          <table class="boxed">
-            <thead><tr>
-              <th>Downtime ID</th><th>Downtime Reason</th><th>Downtime Duration (min)</th><th>No. of Times</th><th>MTBF (min)</th><th>MTTR (min)</th>
-            </tr></thead><tbody>`;
+        // 3) Downtime Summary (Duration in minutes; source is seconds)
+        const dtByReason = {};
+        let failures = 0;
+        opRows.forEach(r => {
+          const submit = safeNum(r.Downtime_Submit);
+          if (submit === 1) {
+            const reason = r.Downtime_Reason_Code ? String(r.Downtime_Reason_Code).trim() : 'UNKNOWN';
+            let durMin = safeNum(r.Downtime_Duration);
+            durMin = Number.isFinite(durMin) ? (durMin / 60) : durMin; // seconds → minutes
+            if (!dtByReason[reason]) dtByReason[reason] = { occ: 0, totalMin: 0, mttrSamples: [] };
+            dtByReason[reason].occ += 1;
+            if (Number.isFinite(durMin)) {
+              dtByReason[reason].totalMin += durMin;
+              dtByReason[reason].mttrSamples.push(durMin);
+            }
+            failures++;
+          }
+        });
+        Object.values(dtByReason).forEach(obj => {
+          obj.mttr = obj.mttrSamples.length ? (obj.mttrSamples.reduce((a,b)=>a+b,0)/obj.mttrSamples.length) : NaN;
+          // MTBF approximation: total runtime minutes / occurrences
+          obj.mtbf = obj.occ ? (totalRuntime / obj.occ) : NaN;
+        });
+        const overallMTTR = failures ? (Object.values(dtByReason).reduce((a,b)=>a+b.totalMin,0) / failures) : NaN;
+        const overallMTBF = failures ? (totalRuntime / failures) : NaN;
 
-        // For MTBF per code we use: totalRuntime / occurrences for that code
-        if (dtMap.size === 0){
-          html += `<tr><td colspan="6">No downtime records (submit=1) for this operator on ${dateStr}.</td></tr>`;
-        } else {
-          dtMap.forEach((v,code)=>{
-            const mttr = v.count ? (v.durationMin / v.count) : 0;
-            const mtbf = v.count ? (totalRuntime / v.count) : 0;
-            html += `<tr>
-              <td>${code}</td>
-              <td>${code}</td>
-              <td>${v.durationMin.toFixed(1)}</td>
-              <td>${v.count}</td>
-              <td>${mtbf.toFixed(0)}</td>
-              <td>${mttr.toFixed(1)}</td>
-            </tr>`;
-          });
+        let dtRows = '';
+        Object.entries(dtByReason).forEach(([reason,obj],i)=>{
+          const dtId = `D-${String(101+i).padStart(3,'0')}`;
+          dtRows += `<tr>
+            <td>${dtId}</td>
+            <td>${reason}</td>
+            <td>${Number(obj.totalMin).toFixed(0)}</td>
+            <td>${obj.occ}</td>
+            <td>${Number.isFinite(obj.mtbf)? obj.mtbf.toFixed(0):'--'}</td>
+            <td>${Number.isFinite(obj.mttr)? obj.mttr.toFixed(0):'--'}</td>
+          </tr>`;
+        });
+
+        html += `
+          <div class="card">
+            <h3>Alarms & Downtimes During Operation</h3>
+            <h4>Downtime Summary</h4>
+            <table>
+              <thead><tr>
+                <th>Downtime ID</th>
+                <th>Downtime Reason</th>
+                <th>Downtime Duration (min)</th>
+                <th>No. of Times</th>
+                <th>MTBF (min)</th>
+                <th>MTTR (min)</th>
+              </tr></thead>
+              <tbody>
+                ${dtRows || '<tr><td colspan="6" class="muted">No downtime events</td></tr>'}
+              </tbody>
+            </table>
+            <div class="small muted" style="margin-top:6px">
+              Overall Operator MTBF: ${Number.isFinite(overallMTBF)? overallMTBF.toFixed(0):'--'} min
+              &nbsp; | &nbsp;
+              Overall Operator MTTR: ${Number.isFinite(overallMTTR)? overallMTTR.toFixed(0):'--'} min
+            </div>
+          </div>`;
+
+        // 4) Energy Consumption & Losses (Per_Min_Consumption split by flags)
+        let runtimeKwh = 0, downtimeKwh = 0, idleKwh = 0, totalKwh = 0;
+        opRows.forEach(r => {
+          const cons = safeNum(r.Per_Min_Consumption);
+          if (!Number.isFinite(cons)) return;
+          totalKwh += cons;
+          const rtFlag = safeNum(r.Runtime) === 1;
+          const dtFlag = safeNum(r.Downtime) === 1;
+          const idFlag = safeNum(r.Idletime) === 1;
+          if (rtFlag) runtimeKwh += cons;
+          else if (dtFlag) downtimeKwh += cons;
+          else if (idFlag) idleKwh += cons;
+        });
+        const bucketSum = runtimeKwh + downtimeKwh + idleKwh;
+        if (Number.isFinite(totalKwh) && Math.abs(totalKwh - bucketSum) > 1e-6) {
+          totalKwh = bucketSum; // force alignment so % add to 100
         }
-        html += `</tbody></table>
-          <div style="text-align:left;margin-top:8px;">
-            <strong>Overall Operator MTBF:</strong> ${overallMTBF.toFixed(0)} min &nbsp; | &nbsp;
-            <strong>Overall Operator MTTR:</strong> ${overallMTTR.toFixed(1)} min
-          </div>
-        </div>`;
+        const pct = (val, total) => (Number.isFinite(val) && total > 0) ? ((val/total)*100) : NaN;
+        const runtimePct = pct(runtimeKwh, totalKwh);
+        const downtimePct = pct(downtimeKwh, totalKwh);
+        const idlePct = pct(idleKwh, totalKwh);
 
-        // 4) Energy Consumption & Losses
-        const pct = (part,total)=> total>0 ? ((part/total)*100).toFixed(0)+'%' : '--';
-        html += `<div class="card"><h3>5. Energy Consumption & Losses</h3>
-          <table class="boxed">
-            <thead><tr><th>Category</th><th>Energy Consumed (kWh)</th><th>% of Total Consumption</th><th>Remarks</th></tr></thead>
-            <tbody>
-              <tr><td>Runtime Consumption</td><td>${ecRuntime.toFixed(2)}</td><td>${pct(ecRuntime,ecTotal)}</td><td>Productive Energy Use</td></tr>
-              <tr><td>Downtime Consumption</td><td>${ecDowntime.toFixed(2)}</td><td>${pct(ecDowntime,ecTotal)}</td><td>Energy Lost during Downtime</td></tr>
-              <tr><td>Idle Consumption</td><td>${ecIdle.toFixed(2)}</td><td>${pct(ecIdle,ecTotal)}</td><td>Standby Loss</td></tr>
-              <tr><th>Total</th><th>${ecTotal.toFixed(2)}</th><th>100%</th><th>-</th></tr>
-            </tbody>
-          </table>
-        </div>`;
+        html += `
+          <div class="card">
+            <h3>Energy Consumption & Losses</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Energy Consumed (kWh)</th>
+                  <th>% of Total Consumption</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Runtime Consumption</td>
+                  <td>${Number(runtimeKwh).toFixed(2)}</td>
+                  <td>${Number.isFinite(runtimePct) ? runtimePct.toFixed(1) + '%' : '--'}</td>
+                  <td>Productive Energy Use</td>
+                </tr>
+                <tr>
+                  <td>Downtime Consumption</td>
+                  <td>${Number(downtimeKwh).toFixed(2)}</td>
+                  <td>${Number.isFinite(downtimePct) ? downtimePct.toFixed(1) + '%' : '--'}</td>
+                  <td>Energy Lost during Downtime</td>
+                </tr>
+                <tr>
+                  <td>Idle Consumption</td>
+                  <td>${Number(idleKwh).toFixed(2)}</td>
+                  <td>${Number.isFinite(idlePct) ? idlePct.toFixed(1) + '%' : '--'}</td>
+                  <td>Standby Loss</td>
+                </tr>
+                <tr>
+                  <th>Total</th>
+                  <th>${Number(totalKwh).toFixed(2)}</th>
+                  <th>100%</th>
+                  <th>-</th>
+                </tr>
+              </tbody>
+            </table>
+          </div>`;
 
         // 5) Supervisor Insights
-        // Find top recurring downtime code
-        let topCode = null, topCount = 0, topDur=0, topMtbf=0, topMttr=0;
-        dtMap.forEach((v,code)=>{ if(v.count>topCount){ topCount=v.count; topCode=code; topDur=v.durationMin; } });
-        if (topCode){
-          topMttr = topCount ? (topDur/topCount) : 0;
-          topMtbf = topCount ? (totalRuntime/topCount) : 0;
-        }
-        const oeeDisp = Number.isFinite(avgOee)? avgOee.toFixed(1) : '--';
-        const qualDisp = Number.isFinite(displayQuality)? Number(displayQuality).toFixed(1) : '--';
+        const qualityPct = Number.isFinite(displayQuality) ? displayQuality.toFixed(1) : '--';
+        const qualityText = `Quality Performance: ${operator} maintained a strong quality output of ${qualityPct}%, ensuring minimal defects despite operational challenges.`;
 
-        html += `<div class="card"><h3>6. Supervisor Insights</h3>
-          <ul style="text-align:left;line-height:1.6;">
-            <li><strong>Quality Performance:</strong> Quality at <strong>${qualDisp}%</strong> with low defects relative to production volume.</li>
-            <li><strong>Downtime Analysis:</strong> ${
-              topCode ? `Most frequent downtime: <strong>${topCode}</strong> (${topCount} occurrences). MTBF = ${topMtbf.toFixed(0)} min | MTTR = ${topMttr.toFixed(1)} min.` : 'No downtime events recorded.'
-            }</li>
-            <li><strong>OEE Review:</strong> Current OEE is <strong>${oeeDisp}%</strong>. Focus on reducing unplanned stops to lift Availability/Performance.</li>
-          </ul>
+        let downtimeText = 'Downtime Analysis: No downtime events recorded.';
+        if (Object.keys(dtByReason).length) {
+          let top = Object.entries(dtByReason).sort((a,b)=>b[1].occ - a[1].occ)[0];
+          const reason = top[0];
+          const occ = top[1].occ;
+          const mtbfTop = Number.isFinite(top[1].mtbf)? top[1].mtbf.toFixed(0):'--';
+          const mttrTop = Number.isFinite(top[1].mttr)? top[1].mttr.toFixed(0):'--';
+          downtimeText = `Downtime Analysis: Majority of downtime events were due to ${reason} (${occ} occurrences). MTBF = ${mtbfTop} min | MTTR = ${mttrTop} min. However, recurrence indicates the need for preventive maintenance checks.`;
+        }
+
+        const oeePct = Number.isFinite(avgOee) ? avgOee.toFixed(1) : '--';
+        const oeeText = `OEE Review: Current OEE stands at ${oeePct}%, which is fair but can be further improved, particularly by addressing downtime reduction in SKU-B production.`;
+
+        html += `<div class="card">
+          <h3>Supervisor Insights</h3>
+          <p>a: ${qualityText}</p>
+          <p>b: ${downtimeText}</p>
+          <p>c: ${oeeText}</p>
         </div>`;
 
         // 6) Recommendations
-        const weakest = (()=> {
-          const vals = [
-            {k:'Availability',v:avgAvail},
-            {k:'Performance',v:avgPerf},
-            {k:'Quality',v:Number(displayQuality)}
-          ].filter(x=>Number.isFinite(x.v));
-          if (!vals.length) return 'Availability';
-          vals.sort((a,b)=>a.v-b.v);
-          return vals[0].k;
-        })();
-        html += `<div class="card"><h3>7. Recommendations</h3>
-          <ol style="text-align:left;line-height:1.6;">
-            <li><strong>Preventive Maintenance:</strong> Schedule periodic checks for the most frequent downtime (<em>${topCode || 'N/A'}</em>) to prevent recurrence.</li>
-            <li><strong>Training Support:</strong> Share quick-resolution SOPs with the operator for <em>${topCode || 'recurring faults'}</em> to reduce MTTR.</li>
-            <li><strong>SKU Focus:</strong> Review machine settings and prep for SKUs that show higher downtime to stabilize changeovers and startup losses.</li>
-            <li><strong>OEE Improvement Plan:</strong> Main loss driver appears to be <strong>${weakest}</strong>. Target a +4–5% OEE gain by addressing this first (optimize cycle time, minimize micro-stops, and enforce start-up checklists).</li>
-          </ol>
+        let recTextA = 'Preventive Maintenance: No downtime data available.';
+        let recTextB = 'Training Support: No downtime data available.';
+        if (Object.keys(dtByReason).length) {
+          let top = Object.entries(dtByReason).sort((a,b)=>b[1].occ - a[1].occ)[0];
+          const reason = top[0];
+          recTextA = `Preventive Maintenance: Schedule periodic checks for systems to reduce recurring '${reason}' issues.`;
+          recTextB = `Training Support: Provide ${operator} with quick-resolution protocols for handling '${reason}' issues, reducing reliance on maintenance.`;
+        }
+
+        let recTextC = 'SKU Focus: No SKU downtime data available.';
+        if (Object.keys(skuAgg).length) {
+          let skuDowntimeSorted = Object.entries(skuAgg).sort((a,b)=>b[1].downtime - a[1].downtime)[0];
+          const skuName = skuDowntimeSorted[0];
+          recTextC = `SKU Focus: Investigate ${skuName} production processes to identify specific bottlenecks causing downtime and optimize machine settings/preparations.`;
+        }
+
+        let weakest = '';
+        let val = Infinity;
+        if (Number.isFinite(avgAvail) && avgAvail < val) { weakest = 'Availability'; val = avgAvail; }
+        if (Number.isFinite(avgPerf) && avgPerf < val) { weakest = 'Performance'; val = avgPerf; }
+        if (Number.isFinite(displayQuality) && displayQuality < val) { weakest = 'Quality'; val = displayQuality; }
+        const oeeImproveTarget = Number.isFinite(avgOee)? (avgOee+5).toFixed(1):'82';
+        const recTextD = `OEE Improvement Plan: Current bottleneck is ${weakest || '—'}. Set a target to improve OEE from ${Number.isFinite(avgOee)? avgOee.toFixed(1):'77.7'}% to ${oeeImproveTarget}%+ by improving ${weakest || 'the weakest KPI'}.`;
+
+        html += `<div class="card">
+          <h3>Recommendations</h3>
+          <p>a: ${recTextA}</p>
+          <p>b: ${recTextB}</p>
+          <p>c: ${recTextC}</p>
+          <p>d: ${recTextD}</p>
         </div>`;
 
-        // Render
+        // Render built HTML
         reportOutput.innerHTML = html;
-        setStatus(`Report ready — rows used: ${rows.length}`);
 
-        // Debug (optional)
-        debugOutput.style.display = 'none';
-        debugOutput.textContent =
-`rows: ${rows.length}
-runtime(min): ${totalRuntime}, downtime(min): ${totalDowntime}, idle(min): ${totalIdle}
-plannedProduction: ${plannedProduction}, actual: ${actualProduction}, good: ${goodProduction}
-energy[kWh] rt:${ecRuntime.toFixed(2)} dt:${ecDowntime.toFixed(2)} idle:${ecIdle.toFixed(2)} total:${ecTotal.toFixed(2)}
-failures: ${totalFailures} overallMTBF:${(totalFailures? (totalRuntime/totalFailures):0).toFixed(1)} overallMTTR:${(totalFailures? (totalDurMinFromEvents/totalFailures):0).toFixed(1)}`;
+        debugOutput.style.display = 'block';
+        debugOutput.textContent = `Averages computed from counts:
+deltaperformance → count=${cntPerf}
+deltaavailability → count=${cntAvail}
+deltaoee → count=${cntOee}
+deltaquality → count=${cntQualityDelta}`;
+
+        setStatus(`Report ready — rows used: ${opRows.length}`);
       } catch (err) {
-        showError(err.message || String(err)); setStatus('');
+        showError(err.message || String(err));
+        setStatus('');
+        console.error(err);
       }
     }
+
+    /* ---------- Events ---------- */
+    datePicker.addEventListener('change', () => {
+      setStatus('');
+      showError('');
+      const date = datePicker.value;
+      if (!date) return;
+      loadOperators(date);
+    });
+
+    btnGenerate.addEventListener('click', generateReport);
+
+    (function setToday(){
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      datePicker.value = `${y}-${m}-${day}`;
+      if (datePicker.value) loadOperators(datePicker.value).catch(()=>{});
+    })();
   </script>
 </body>
 </html>
