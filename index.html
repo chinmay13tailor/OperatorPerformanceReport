@@ -12,71 +12,173 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; padding: 18px; background:#f7fafc; color:#111; }
+    :root{
+      --brand: #2563eb;           /* primary (blue) */
+      --brand-600:#1e40af;
+      --accent:#0ea5e9;           /* secondary accent (cyan) */
+      --ok:#16a34a;               /* green */
+      --warn:#f59e0b;             /* amber */
+      --bad:#dc2626;              /* red */
+      --ink:#0f172a;              /* dark text */
+      --muted:#64748b;            /* muted text */
+      --paper:#ffffff;
+      --panel:#f8fafc;            /* page bg */
+      --line:#e5e7eb;             /* border */
+      --thead:#eef2ff;            /* table head bg */
+      --thead-border:#c7d2fe;
+      --stripe:#fafafa;           /* row stripe */
+      --shadow: 0 6px 18px rgba(16,24,40,.06);
+      --radius: 14px;
+      --radius-sm:10px;
+    }
+
+    /* Page */
+    html, body { height: 100%; }
+    body {
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      padding: 18px;
+      background: radial-gradient(1500px 550px at 10% -20%, #e5f3ff 0%, transparent 60%) no-repeat,
+                  radial-gradient(1200px 450px at 90% -10%, #eafaf6 0%, transparent 60%) no-repeat,
+                  var(--panel);
+      color: var(--ink);
+    }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    /* Controls */
     h2 { margin: 0 0 12px; }
-    .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
-    input[type="date"], select { padding:8px 10px; border-radius:6px; border:1px solid #d1d5db; }
-    button { padding:9px 12px; background:#2563eb; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600; }
+    .controls {
+      display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-bottom:18px;
+      background: var(--paper);
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      box-shadow: var(--shadow);
+    }
+    label { font-size:12px; color:var(--muted); display:block; margin:0 0 4px; }
+    input[type="date"], select {
+      padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#fff;
+      box-shadow: inset 0 1px 1px rgba(0,0,0,.03);
+      min-width: 180px;
+    }
+    button {
+      padding:11px 14px; background:linear-gradient(180deg, var(--brand) 0%, var(--brand-600) 100%);
+      color:#fff; border:0; border-radius:10px; cursor:pointer; font-weight:600;
+      letter-spacing:.2px; box-shadow: 0 6px 14px rgba(37, 99, 235, .25);
+    }
+    button.secondary {
+      background: #fff; color: var(--brand); border:1px solid var(--brand);
+      box-shadow:none;
+    }
     button:disabled { opacity:.6; cursor:not-allowed; }
+    .small { font-size:12px; color:var(--muted); }
 
-    .card { background: #fff; padding:14px; border-radius:10px; border:1px solid #e6e9ef; margin-bottom:14px; }
-    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
-    th, td { padding:8px; border:1px solid #999; text-align:center; }
-    th { background:#f8fafc; font-weight:700; }
-    .muted { color:#6b7280; font-size:13px; }
-    .small { font-size:12px; color:#6b7280; }
-    pre { background:#f3f4f6; padding:8px; border-radius:6px; overflow:auto; max-height:180px; }
-    .error { color:#991b1b; background:#fff1f2; padding:8px; border-radius:6px; border:1px solid #fecaca; margin-top:8px; }
+    /* Cards / Sections */
+    .card {
+      background: var(--paper); padding:16px; border-radius: var(--radius);
+      border:1px solid var(--line); margin-bottom:16px; box-shadow: var(--shadow);
+    }
+    .section-title{
+      display:flex; align-items:center; gap:10px; margin:0 0 12px;
+      font-size:18px;
+    }
+    .section-title::before{
+      content:""; width:8px; height:18px; border-radius:8px;
+      background: linear-gradient(180deg, var(--brand) 0%, var(--accent) 100%);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+      display:inline-block;
+    }
 
-    /* Header */
-    .report-header { border:1px solid #000; border-radius:6px; padding:10px 20px; margin-bottom:20px; background:#fff; }
-    .header-top { display:flex; justify-content:space-between; align-items:center; }
+    /* Tables */
+    table { width:100%; border-collapse:separate; border-spacing:0; margin-top:6px; font-size:13px; }
+    thead th {
+      background: linear-gradient(180deg, var(--thead) 0%, #e9efff 100%);
+      color:#1f2937; font-weight:700; letter-spacing:.2px;
+      border-top:1px solid var(--thead-border);
+      border-bottom:1px solid var(--thead-border);
+    }
+    th, td { padding:10px 10px; text-align:center; }
+    tbody td { border-bottom:1px solid var(--line); }
+    tbody tr:nth-child(odd){ background: var(--stripe); }
+    tbody tr:hover { background:#eef6ff; }
+    table { border:1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    table thead th:first-child { border-top-left-radius:10px; }
+    table thead th:last-child { border-top-right-radius:10px; }
+
+    .muted { color:var(--muted); }
+
+    /* Report Header */
+    .report-header {
+      border:1px solid var(--line); border-radius: var(--radius);
+      padding:16px 22px; margin-bottom:20px; background:#fff; box-shadow: var(--shadow);
+    }
+    .header-top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
     .header-top img { max-height:60px; width:auto; }
     .header-center { text-align:center; flex:1; }
-    .header-center h1 { margin:0; font-size:22px; font-weight:bold; }
-    .header-center h3 { margin:4px 0 0; font-size:14px; font-weight:normal; }
-    .header-center h2 { margin:6px 0 0; font-size:18px; font-weight:bold; }
-    .header-bottom { display:flex; justify-content:space-between; font-size:13px; margin-top:6px; font-weight:bold; }
+    .header-center h1 { margin:0; font-size:24px; font-weight:800; letter-spacing:.2px; }
+    .header-center h3 { margin:4px 0 0; font-size:13px; font-weight:500; color:var(--muted); }
+    .header-center h2 { margin:8px 0 0; font-size:18px; font-weight:700; color:#111; letter-spacing:.3px; }
+    .header-bottom {
+      display:flex; flex-wrap:wrap; gap:10px 18px; justify-content:space-between;
+      font-size:13px; margin-top:10px; font-weight:600; color:#0b1324;
+      border-top:1px dashed var(--line); padding-top:10px;
+    }
 
-    /* Footer */
-    .report-footer { border:1px solid #000; border-radius:6px; padding:10px 20px; margin-top:20px; background:#fff; }
+    /* Report Footer */
+    .report-footer {
+      border:1px solid var(--line); border-radius: var(--radius);
+      padding:16px 20px; margin-top:20px; background:#fff; box-shadow: var(--shadow);
+    }
     .footer-section { margin-bottom:16px; }
-    .footer-label { font-weight:bold; display:block; margin-bottom:6px; }
-    .remarks-box { border:1px solid #000; min-height:40px; border-radius:4px; background:#fff; padding:4px; }
-    .signatures { display:flex; justify-content:space-between; margin-top:20px; }
-    .signature { width:45%; }
-    .signature-label { font-weight:bold; display:block; margin-bottom:6px; }
-    .signature-line { border-bottom:1px solid #000; height:30px; margin-top:5px; }
+    .footer-label { font-weight:700; display:block; margin-bottom:6px; color:#111; }
+    .remarks-box {
+      border:1px dashed var(--brand); min-height:48px; border-radius:10px; background:#fff;
+      padding:8px 10px; outline:none;
+    }
+    .signatures { display:flex; gap:20px; justify-content:space-between; margin-top:14px; }
+    .signature { flex:1; }
+    .signature-label { font-weight:700; display:block; margin-bottom:10px; }
+    .signature-line { border-bottom:2px solid #0b1324; height:34px; border-radius:2px; }
 
     /* Gauges */
-    .gauge-container { display:grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap:10px; }
-    .gauge-box { width:100%; height:210px; }
+    .gauge-container { display:grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap:12px; }
+    .gauge-box { width:100%; height:220px; border:1px solid var(--line); border-radius:12px; padding:6px; background:#fff; }
     @media (max-width: 1100px){
-      .gauge-container{ grid-template-columns: repeat(2, minmax(200px, 1fr)); }
+      .gauge-container{ grid-template-columns: repeat(2, minmax(220px, 1fr)); }
     }
     @media (max-width: 560px){
       .gauge-container{ grid-template-columns: 1fr; }
     }
 
-    /* Print-friendly (helps html2canvas produce crisp A4 pages) */
+    /* Alerts */
+    .error { color:#991b1b; background:#fff1f2; padding:10px 12px; border-radius:10px; border:1px solid #fecaca; margin-top:8px; }
+
+    /* Print-friendly */
     @media print {
       body { background:#fff; }
       .controls { display:none; }
-      .card { page-break-inside: avoid; }
+      .card, .report-header, .report-footer { page-break-inside: avoid; box-shadow:none; }
+      .container { max-width: 100%; }
     }
   </style>
 </head>
 <body>
+<div class="container">
 
   <!-- Date Selection -->
   <div class="controls">
-    <label for="datePicker">Date</label>
-    <input id="datePicker" type="date" />
-    <label for="operatorSelect">Operator</label>
-    <select id="operatorSelect"><option value="">-- Select Operator --</option></select>
-    <button id="generateBtn">Generate</button>
-    <button id="pdfBtn" title="Download as A4 PDF">Generate PDF</button>
-    <div id="status" class="small muted" style="margin-left:12px"></div>
+    <div>
+      <label for="datePicker">Date</label>
+      <input id="datePicker" type="date" />
+    </div>
+    <div>
+      <label for="operatorSelect">Operator</label>
+      <select id="operatorSelect"><option value="">-- Select Operator --</option></select>
+    </div>
+    <div style="display:flex; gap:8px; align-items:end;">
+      <button id="generateBtn">Generate</button>
+      <button id="pdfBtn" class="secondary" title="Download as A4 PDF">Generate PDF</button>
+    </div>
+    <div class="small" id="status" style="margin-left:auto"></div>
   </div>
 
   <!-- Report Section -->
@@ -106,7 +208,7 @@
     <div class="report-footer">
       <div class="footer-section">
         <span class="footer-label">Remarks:</span>
-        <div class="remarks-box" contenteditable="true"></div>
+        <div class="remarks-box" contenteditable="true" placeholder="Type remarks here..."></div>
       </div>
       <div class="signatures">
         <div class="signature">
@@ -120,6 +222,8 @@
       </div>
     </div>
   </div>
+
+</div> <!-- /container -->
 
   <script>
     /* ---------- Configuration ---------- */
@@ -170,8 +274,8 @@
     async function fetchTelemetryForDate(dateStr) {
       if (!TOKEN) throw new Error("Missing token in URL (?token=YOUR_JWT)");
       const start = new Date(dateStr + "T00:00:00").getTime();
-      const end = new Date(dateStr + "T23:59:59").getTime();
-      const url = `${API_BASE}/plugins/telemetry/DEVICE/${DEVICE_ID}/values/timeseries?keys=${encodeURIComponent(KEYS_PARAM)}&startTs=${start}&endTs=${end}&interval=60000&limit=5000`;
+      theEnd   = new Date(dateStr + "T23:59:59").getTime();
+      const url = `${API_BASE}/plugins/telemetry/DEVICE/${DEVICE_ID}/values/timeseries?keys=${encodeURIComponent(KEYS_PARAM)}&startTs=${start}&endTs=${theEnd}&interval=60000&limit=5000`;
       const res = await fetch(url, { headers: { "X-Authorization": `Bearer ${TOKEN}` } });
       if (!res.ok) {
         const txt = await res.text().catch(()=>res.statusText);
@@ -227,7 +331,7 @@
           bar: { color: "#2563eb" },
           bgcolor: "white",
           borderwidth: 1,
-          bordercolor: "#aaa",
+          bordercolor: "#cbd5e1",
           steps: [
             { range: [0, 50], color: "#fde68a" },
             { range: [50, 75], color: "#facc15" },
@@ -240,7 +344,7 @@
           }
         }
       }];
-      const layout = { width: 260, height: 210, margin: { t: 22, r: 16, l: 16, b: 10 } };
+      const layout = { width: 260, height: 220, margin: { t: 22, r: 16, l: 16, b: 10 } };
       Plotly.newPlot(id, data, layout, {displayModeBar:false});
     }
 
@@ -327,12 +431,21 @@
         let html = '';
 
         // 1) Production Details (SKU-wise)
-        html += `<div class="card"><h3>1. Production Details (SKU-wise)</h3>`;
-        html += `<table><thead><tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th></tr></thead><tbody>`;
+        html += `<div class="card">
+          <h3 class="section-title">1. Production Details (SKU-wise)</h3>
+          <table>
+            <thead><tr>
+              <th>SKU Name</th>
+              <th>Production (Units)</th>
+              <th>Runtime (hrs)</th>
+              <th>Downtime (hrs)</th>
+              <th>Idletime (hrs)</th>
+            </tr></thead>
+            <tbody>`;
         for (const sku of Object.keys(skuAgg)) {
           const d = skuAgg[sku];
           html += `<tr>
-            <td>${sku}</td>
+            <td style="font-weight:600">${sku}</td>
             <td>${Number(d.production).toFixed(2)}</td>
             <td>${(Number(d.runtime) / 60).toFixed(2)}</td>
             <td>${(Number(d.downtime) / 60).toFixed(2)}</td>
@@ -341,18 +454,23 @@
         }
         html += `</tbody></table></div>`;
 
-        // 2) Machine Performance Summary (Gauges + details table)
-        html += `<div class="card"><h3>2. Machine Performance Summary</h3>
+        // 2) Machine Performance Summary
+        html += `<div class="card">
+          <h3 class="section-title">2. Machine Performance Summary</h3>
           <div class="gauge-container">
             <div id="gaugeOEE" class="gauge-box"></div>
             <div id="gaugePerf" class="gauge-box"></div>
             <div id="gaugeAvail" class="gauge-box"></div>
             <div id="gaugeQuality" class="gauge-box"></div>
           </div>
-          <table style="margin-top:10px;">
+          <table style="margin-top:12px;">
             <thead><tr>
-              <th>Planned Production</th><th>Planned Production Time (min)</th><th>Actual Production</th>
-              <th>Runtime (hrs)</th><th>Good Production</th><th>Downtime (hrs)</th>
+              <th>Planned Production</th>
+              <th>Planned Production Time (min)</th>
+              <th>Actual Production</th>
+              <th>Runtime (hrs)</th>
+              <th>Good Production</th>
+              <th>Downtime (hrs)</th>
             </tr></thead>
             <tbody><tr>
               <td>${Number.isFinite(plannedProduction) ? plannedProduction.toFixed(0) : '--'}</td>
@@ -365,7 +483,7 @@
           </table>
         </div>`;
 
-        // 3) Downtime Summary (seconds → minutes)
+        // 3) Downtime Summary
         const dtByReason = {};
         let failures = 0;
         opRows.forEach(r => {
@@ -385,7 +503,7 @@
         });
         Object.values(dtByReason).forEach(obj => {
           obj.mttr = obj.mttrSamples.length ? (obj.mttrSamples.reduce((a,b)=>a+b,0)/obj.mttrSamples.length) : NaN;
-          obj.mtbf = obj.occ ? (totalRuntime / obj.occ) : NaN; // runtime minutes / occurrences
+          obj.mtbf = obj.occ ? (totalRuntime / obj.occ) : NaN;
         });
         const overallMTTR = failures ? (Object.values(dtByReason).reduce((a,b)=>a+b.totalMin,0) / failures) : NaN;
         const overallMTBF = failures ? (totalRuntime / failures) : NaN;
@@ -394,8 +512,8 @@
         Object.entries(dtByReason).forEach(([reason,obj],i)=>{
           const dtId = `D-${String(101+i).padStart(3,'0')}`;
           dtRows += `<tr>
-            <td>${dtId}</td>
-            <td>${reason}</td>
+            <td style="font-weight:600">${dtId}</td>
+            <td style="text-align:left">${reason}</td>
             <td>${Number(obj.totalMin).toFixed(0)}</td>
             <td>${obj.occ}</td>
             <td>${Number.isFinite(obj.mtbf)? obj.mtbf.toFixed(0):'--'}</td>
@@ -405,12 +523,11 @@
 
         html += `
           <div class="card">
-            <h3>3. Alarms & Downtimes During Operation</h3>
-            <h4>Downtime Summary</h4>
+            <h3 class="section-title">3. Alarms & Downtimes During Operation</h3>
             <table>
               <thead><tr>
                 <th>Downtime ID</th>
-                <th>Downtime Reason</th>
+                <th style="text-align:left">Downtime Reason</th>
                 <th>Downtime Duration (min)</th>
                 <th>No. of Times</th>
                 <th>MTBF (min)</th>
@@ -420,10 +537,10 @@
                 ${dtRows || '<tr><td colspan="6" class="muted">No downtime events</td></tr>'}
               </tbody>
             </table>
-            <div class="small muted" style="margin-top:6px">
-              Overall Operator MTBF: ${Number.isFinite(overallMTBF)? overallMTBF.toFixed(0):'--'} min
+            <div class="small" style="margin-top:8px; color:#0b1324; font-weight:600;">
+              Overall Operator MTBF: <span style="color:var(--brand)">${Number.isFinite(overallMTBF)? overallMTBF.toFixed(0):'--'}</span> min
               &nbsp; | &nbsp;
-              Overall Operator MTTR: ${Number.isFinite(overallMTTR)? overallMTTR.toFixed(0):'--'} min
+              Overall Operator MTTR: <span style="color:var(--brand)">${Number.isFinite(overallMTTR)? overallMTTR.toFixed(0):'--'}</span> min
             </div>
           </div>`;
 
@@ -442,7 +559,7 @@
         });
         const bucketSum = runtimeKwh + downtimeKwh + idleKwh;
         if (Number.isFinite(totalKwh) && Math.abs(totalKwh - bucketSum) > 1e-6) {
-          totalKwh = bucketSum; // align so % add to 100
+          totalKwh = bucketSum;
         }
         const pct = (val, total) => (Number.isFinite(val) && total > 0) ? ((val/total)*100) : NaN;
         const runtimePct = pct(runtimeKwh, totalKwh);
@@ -451,7 +568,7 @@
 
         html += `
           <div class="card">
-            <h3>4. Energy Consumption & Losses</h3>
+            <h3 class="section-title">4. Energy Consumption & Losses</h3>
             <table>
               <thead>
                 <tr>
@@ -463,19 +580,19 @@
               </thead>
               <tbody>
                 <tr>
-                  <td>Runtime Consumption</td>
+                  <td style="text-align:left; font-weight:600">Runtime Consumption</td>
                   <td>${Number(runtimeKwh).toFixed(2)}</td>
                   <td>${Number.isFinite(runtimePct) ? runtimePct.toFixed(1) + '%' : '--'}</td>
                   <td>Productive Energy Use</td>
                 </tr>
                 <tr>
-                  <td>Downtime Consumption</td>
+                  <td style="text-align:left; font-weight:600">Downtime Consumption</td>
                   <td>${Number(downtimeKwh).toFixed(2)}</td>
                   <td>${Number.isFinite(downtimePct) ? downtimePct.toFixed(1) + '%' : '--'}</td>
                   <td>Energy Lost during Downtime</td>
                 </tr>
                 <tr>
-                  <td>Idle Consumption</td>
+                  <td style="text-align:left; font-weight:600">Idle Consumption</td>
                   <td>${Number(idleKwh).toFixed(2)}</td>
                   <td>${Number.isFinite(idlePct) ? idlePct.toFixed(1) + '%' : '--'}</td>
                   <td>Standby Loss</td>
@@ -508,10 +625,10 @@
         const oeeText = `OEE Review: Current OEE stands at ${oeePct}%, which is fair but can be further improved, particularly by addressing downtime reduction in SKU-B production.`;
 
         html += `<div class="card">
-          <h3>5. Supervisor Insights</h3>
-          <p>a: ${qualityText}</p>
-          <p>b: ${downtimeText}</p>
-          <p>c: ${oeeText}</p>
+          <h3 class="section-title">5. Supervisor Insights</h3>
+          <p style="margin:.25rem 0">a: ${qualityText}</p>
+          <p style="margin:.25rem 0">b: ${downtimeText}</p>
+          <p style="margin:.25rem 0">c: ${oeeText}</p>
         </div>`;
 
         // 6) Recommendations
@@ -540,11 +657,13 @@
         const recTextD = `OEE Improvement Plan: Current bottleneck is ${weakest || '—'}. Set a target to improve OEE from ${Number.isFinite(avgOee)? avgOee.toFixed(1):'77.7'}% to ${oeeImproveTarget}%+ by improving ${weakest || 'the weakest KPI'}.`;
 
         html += `<div class="card">
-          <h3>6. Recommendations</h3>
-          <p>a: ${recTextA}</p>
-          <p>b: ${recTextB}</p>
-          <p>c: ${recTextC}</p>
-          <p>d: ${recTextD}</p>
+          <h3 class="section-title">6. Recommendations</h3>
+          <ul style="margin:0 0 0 16px; padding:0; line-height:1.5;">
+            <li>${recTextA}</li>
+            <li>${recTextB}</li>
+            <li>${recTextC}</li>
+            <li>${recTextD}</li>
+          </ul>
         </div>`;
 
         // Render built HTML
@@ -576,15 +695,14 @@ deltaquality → count=${cntQualityDelta}`;
       try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'pt', 'a4'); // 595.28 x 841.89 pt
-        const report = document.getElementById('reportSection');
+        const report = document.querySelector('.container'); // capture with margins
 
-        // Use a higher scale for sharper output
         const canvas = await html2canvas(report, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
 
-        const pageWidth = doc.internal.pageSize.getWidth();   // 595.28
-        const pageHeight = doc.internal.pageSize.getHeight(); // 841.89
-        const imgWidth = pageWidth;                            // full-width
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const imgWidth = pageWidth;
         const imgHeight = canvas.height * imgWidth / canvas.width;
 
         let heightLeft = imgHeight;
@@ -600,8 +718,8 @@ deltaquality → count=${cntQualityDelta}`;
           heightLeft -= pageHeight;
         }
 
-        const dateStr = document.getElementById('headerDate').textContent.replace('Date: ','') || 'Report';
-        const operator = document.getElementById('headerOperator').textContent.replace('Operator Name: ','') || 'Operator';
+        const dateStr = (document.getElementById('headerDate').textContent || '').replace('Date: ','') || 'Report';
+        const operator = (document.getElementById('headerOperator').textContent || '').replace('Operator Name: ','') || 'Operator';
         doc.save(`Operator_Performance_Report_${operator}_${dateStr}.pdf`);
       } catch (e) {
         console.error(e);
