@@ -14,21 +14,15 @@
 
     .card { background: #fff; padding:14px; border-radius:10px; border:1px solid #e6e9ef; margin-bottom:14px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
-    th, td { padding:8px; border:1px solid #e6e9ef; text-align:center; }
+    th, td { padding:8px; border:1px solid #999; text-align:center; }
     th { background:#f8fafc; font-weight:700; }
     .muted { color:#6b7280; font-size:13px; }
     .small { font-size:12px; color:#6b7280; }
     pre { background:#f3f4f6; padding:8px; border-radius:6px; overflow:auto; max-height:180px; }
-    .error { color:#991b1b; background:#fff1f2; padding:8px; border-radius:6px; border:1px solid #fecaca; margin-top:8px; }
+    .error { color:#991b1b; background:#fff1f2; padding:8px; border-radius:6px; border:1px solid #fecaca; margin-top:8px; display:none; }
 
-    /* Report Header (rendered inside report section) */
-    .report-header {
-      border:1px solid #000;
-      border-radius:6px;
-      padding:10px 20px;
-      margin-bottom:20px;
-      background:#fff;
-    }
+    /* Report Header (inside report section) */
+    .report-header { border:1px solid #000; border-radius:6px; padding:10px 20px; margin-bottom:20px; background:#fff; }
     .header-top { display:flex; justify-content:space-between; align-items:center; }
     .header-top img { max-height:60px; width:auto; }
     .header-center { text-align:center; flex:1; }
@@ -36,6 +30,36 @@
     .header-center h3 { margin:4px 0 0; font-size:14px; font-weight:normal; }
     .header-center h2 { margin:6px 0 0; font-size:18px; font-weight:bold; }
     .header-bottom { display:flex; justify-content:space-between; font-size:13px; margin-top:6px; font-weight:bold; }
+
+    /* Machine Performance visual style (from your sample) */
+    .perf-summary { margin-top:10px; border:2px solid #555; }
+    .perf-summary th, .perf-summary td { border:1px solid #555; }
+    .perf-summary th { background:#e5e7eb; }
+    .perf-subtable { margin-top:10px; border:2px solid #555; }
+    .perf-subtable th, .perf-subtable td { border:1px solid #555; }
+    .perf-subtable th { background:#e5e7eb; }
+
+    /* Report Footer */
+    .report-footer {
+      border:1px solid #000; border-radius:6px; padding:12px; background:#fff;
+      margin-top:18px;
+    }
+    .footer-remarks { margin-bottom:12px; }
+    .footer-remarks label { font-weight:700; }
+    .remarks-box {
+      width:100%; min-height:48px; border:1px solid #000; border-radius:4px; margin-top:6px; padding:6px; background:#fff;
+    }
+    .footer-signs { display:flex; gap:16px; }
+    .sign-col { flex:1; }
+    .sign-col label { font-weight:700; }
+    .sign-line {
+      border-bottom:1px solid #000; height:30px; margin-top:6px; border-radius:2px;
+    }
+    .sign-meta { display:flex; gap:10px; margin-top:6px; }
+    .sign-meta > div { flex:1; }
+    .sign-input {
+      width:100%; height:26px; border:1px solid #000; border-radius:4px; padding:4px;
+    }
   </style>
 </head>
 <body>
@@ -69,8 +93,35 @@
       </div>
     </div>
 
-    <div id="errorBox" style="display:none" class="error"></div>
+    <div id="errorBox" class="error"></div>
     <div id="reportOutput"></div>
+
+    <!-- Footer appended after the whole report -->
+    <div id="reportFooter" class="report-footer" style="display:none;">
+      <div class="footer-remarks">
+        <label>Remarks :</label>
+        <div class="remarks-box" contenteditable="true" spellcheck="false"></div>
+      </div>
+      <div class="footer-signs">
+        <div class="sign-col">
+          <label>Reviewed By :</label>
+          <div class="sign-line"></div>
+          <div class="sign-meta">
+            <div><small class="muted">Name</small><input class="sign-input" type="text" /></div>
+            <div><small class="muted">Date</small><input class="sign-input" type="text" /></div>
+          </div>
+        </div>
+        <div class="sign-col">
+          <label>Checked By :</label>
+          <div class="sign-line"></div>
+          <div class="sign-meta">
+            <div><small class="muted">Name</small><input class="sign-input" type="text" /></div>
+            <div><small class="muted">Date</small><input class="sign-input" type="text" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <pre id="debugOutput" style="display:none"></pre>
   </div>
 
@@ -90,6 +141,7 @@
     const errorBox = document.getElementById('errorBox');
     const debugOutput = document.getElementById('debugOutput');
     const reportSection = document.getElementById('reportSection');
+    const reportFooter = document.getElementById('reportFooter');
 
     /* ---------- Helpers ---------- */
     function showError(msg) {
@@ -171,6 +223,7 @@
       showError('');
       reportOutput.innerHTML = '';
       debugOutput.style.display = 'none';
+      reportFooter.style.display = 'none';
 
       const dateStr = datePicker.value;
       const operator = operatorSelect.value;
@@ -229,7 +282,7 @@
 
           actualProduction   += Number.isFinite(ms) ? ms : 0;
           goodProduction     += Number.isFinite(safeNum(r.Good_Production)) ? safeNum(r.Good_Production) : 0;
-          plannedProduction  += Number.isFinite(stdSpeed) ? stdSpeed : 0;
+          plannedProduction  += Number.isFinite(stdSpeed) ? stdSpeed : 0; // planned from Standard_Speed
           plannedTime         = Number.isFinite(safeNum(r.Planned_Production_Time)) ? safeNum(r.Planned_Production_Time) : plannedTime;
 
           const dp  = safeNum(r.deltaperformance);  if (Number.isFinite(dp))  { sumPerf += dp;  cntPerf++; }
@@ -249,7 +302,7 @@
         let html = '';
 
         // 1) Production Details (SKU-wise)
-        html += `<div class="card"><h3>Production Details (SKU-wise)</h3>`;
+        html += `<div class="card"><h3>2. Production Details (SKU-wise)</h3>`;
         html += `<table><thead><tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th></tr></thead><tbody>`;
         for (const sku of Object.keys(skuAgg)) {
           const d = skuAgg[sku];
@@ -263,9 +316,9 @@
         }
         html += `</tbody></table></div>`;
 
-        // 2) Machine Performance Summary
-        html += `<div class="card"><h3>Machine Performance Summary</h3>`;
-        html += `<table><thead><tr><th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th></tr></thead><tbody>`;
+        // 2) Machine Performance Summary (with your table layout)
+        html += `<div class="card"><h3>3. Machine Performance Summary</h3>`;
+        html += `<table class="perf-summary"><thead><tr><th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th></tr></thead><tbody>`;
         html += `<tr>
           <td>${Number.isFinite(avgOee) ? avgOee.toFixed(2) + '%' : '--'}</td>
           <td>${Number.isFinite(avgPerf) ? avgPerf.toFixed(2) + '%' : '--'}</td>
@@ -273,18 +326,25 @@
           <td>${Number.isFinite(displayQuality) ? Number(displayQuality).toFixed(2) + '%' : '--'}</td>
         </tr></tbody></table>`;
 
-        html += `<table style="margin-top:10px;"><thead><tr>
-          <th>Planned Production</th><th>Planned Production Time (min)</th><th>Actual Production</th>
-          <th>Runtime (hrs)</th><th>Good Production</th><th>Downtime (hrs)</th>
-        </tr></thead><tbody>`;
-        html += `<tr>
-          <td>${Number.isFinite(plannedProduction) ? plannedProduction.toFixed(0) : '--'}</td>
-          <td>${Number.isFinite(plannedTime) ? plannedTime.toFixed(0) : '--'}</td>
-          <td>${actualProduction.toFixed(0)}</td>
-          <td>${(totalRuntime / 60).toFixed(2)}</td>
-          <td>${goodProduction.toFixed(0)}</td>
-          <td>${(totalDowntime / 60).toFixed(2)}</td>
-        </tr></tbody></table></div>`;
+        html += `<table class="perf-subtable" style="margin-top:10px;"><thead><tr>
+          <th>Performance</th><th>Availability</th><th>Quality</th>
+        </tr></thead><tbody>
+        <tr>
+          <td>Planned Production: ${Number.isFinite(plannedProduction) ? plannedProduction.toFixed(0) : '--'}</td>
+          <td>Planned Production Time: ${Number.isFinite(plannedTime) ? plannedTime.toFixed(0) : '--'} min</td>
+          <td>Actual Production: ${actualProduction.toFixed(0)}</td>
+        </tr>
+        <tr>
+          <td>Actual Production: ${actualProduction.toFixed(0)}</td>
+          <td>Runtime: ${(totalRuntime).toFixed(0)} min</td>
+          <td>Good Production: ${goodProduction.toFixed(0)}</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>Downtime: ${(totalDowntime).toFixed(0)} min</td>
+          <td></td>
+        </tr>
+        </tbody></table></div>`;
 
         // 3) Downtime Summary (Duration in minutes; source is seconds)
         const dtByReason = {};
@@ -327,7 +387,7 @@
 
         html += `
           <div class="card">
-            <h3>Alarms & Downtimes During Operation</h3>
+            <h3>4. Alarms & Downtimes During Operation</h3>
             <h4>Downtime Summary</h4>
             <table>
               <thead><tr>
@@ -364,7 +424,7 @@
         });
         const bucketSum = runtimeKwh + downtimeKwh + idleKwh;
         if (Number.isFinite(totalKwh) && Math.abs(totalKwh - bucketSum) > 1e-6) {
-          totalKwh = bucketSum; // force alignment so % add to 100
+          totalKwh = bucketSum; // ensure % sums to 100
         }
         const pct = (val, total) => (Number.isFinite(val) && total > 0) ? ((val/total)*100) : NaN;
         const runtimePct = pct(runtimeKwh, totalKwh);
@@ -373,7 +433,7 @@
 
         html += `
           <div class="card">
-            <h3>Energy Consumption & Losses</h3>
+            <h3>5. Energy Consumption & Losses</h3>
             <table>
               <thead>
                 <tr>
@@ -430,7 +490,7 @@
         const oeeText = `OEE Review: Current OEE stands at ${oeePct}%, which is fair but can be further improved, particularly by addressing downtime reduction in SKU-B production.`;
 
         html += `<div class="card">
-          <h3>Supervisor Insights</h3>
+          <h3>6. Supervisor Insights</h3>
           <p>a: ${qualityText}</p>
           <p>b: ${downtimeText}</p>
           <p>c: ${oeeText}</p>
@@ -462,7 +522,7 @@
         const recTextD = `OEE Improvement Plan: Current bottleneck is ${weakest || '—'}. Set a target to improve OEE from ${Number.isFinite(avgOee)? avgOee.toFixed(1):'77.7'}% to ${oeeImproveTarget}%+ by improving ${weakest || 'the weakest KPI'}.`;
 
         html += `<div class="card">
-          <h3>Recommendations</h3>
+          <h3>7. Recommendations</h3>
           <p>a: ${recTextA}</p>
           <p>b: ${recTextB}</p>
           <p>c: ${recTextC}</p>
@@ -472,6 +532,10 @@
         // Render built HTML
         reportOutput.innerHTML = html;
 
+        // Show footer AFTER report is rendered
+        reportFooter.style.display = 'block';
+
+        // Debug counts
         debugOutput.style.display = 'block';
         debugOutput.textContent = `Averages computed from counts:
 deltaperformance → count=${cntPerf}
