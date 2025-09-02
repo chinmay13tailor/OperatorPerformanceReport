@@ -17,7 +17,7 @@
       --brand-600:#1e40af;
       --accent:#0ea5e9;
       --ink:#0f172a;
-      --muted:#64748b;
+      --muted:#475569;
       --paper:#ffffff;
       --panel:#f8fafc;
       --line:#e5e7eb;
@@ -33,65 +33,67 @@
     html, body { height: 100%; }
     body {
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      font-size: 15px;               /* bigger base font */
+      line-height: 1.45;
       padding: 12px;
       background: var(--panel);
       color: var(--ink);
     }
-    /* Fit the report to available width on screen */
     .container { max-width: 100%; margin: 0 auto; }
 
     /* Controls */
     .controls {
-      display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-bottom:12px;
+      display:flex; gap:12px; align-items:end; flex-wrap:wrap; margin-bottom:14px;
       background: var(--paper);
       border:1px solid var(--line);
       border-radius: var(--radius);
-      padding: 10px;
+      padding: 12px;
       box-shadow: var(--shadow);
     }
-    label { font-size:12px; color:var(--muted); display:block; margin:0 0 4px; }
+    label { font-size:14px; color:var(--muted); display:block; margin:0 0 6px; font-weight:700; }
     input[type="date"], select {
-      padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#fff;
+      padding:12px 14px; border-radius:10px; border:1px solid var(--line); background:#fff;
       box-shadow: inset 0 1px 1px rgba(0,0,0,.03);
-      min-width: 160px;
+      min-width: 180px; font-size:15px;
     }
     button {
-      padding:10px 13px; background:linear-gradient(180deg, var(--brand) 0%, var(--brand-600) 100%);
-      color:#fff; border:0; border-radius:10px; cursor:pointer; font-weight:600;
-      letter-spacing:.2px; box-shadow: 0 6px 14px rgba(37, 99, 235, .25);
+      padding:12px 16px; background:linear-gradient(180deg, var(--brand) 0%, var(--brand-600) 100%);
+      color:#fff; border:0; border-radius:10px; cursor:pointer; font-weight:800;
+      letter-spacing:.2px; box-shadow: 0 6px 14px rgba(37, 99, 235, .25); font-size:15px;
     }
     button.secondary {
       background: #fff; color: var(--brand); border:1px solid var(--brand);
-      box-shadow:none;
+      box-shadow:none; font-weight:800;
     }
     button:disabled { opacity:.6; cursor:not-allowed; }
-    .small { font-size:12px; color:var(--muted); }
+    .small { font-size:13px; color:var(--muted); }
 
     /* Cards / Sections */
     .card {
-      background: var(--paper); padding:12px; border-radius: var(--radius);
-      border:1px solid var(--line); margin-bottom:12px; box-shadow: var(--shadow);
+      background: var(--paper); padding:14px; border-radius: var(--radius);
+      border:1px solid var(--line); margin-bottom:14px; box-shadow: var(--shadow);
     }
     .section-title{
-      display:flex; align-items:center; gap:8px; margin:0 0 10px;
-      font-size:16px;
+      display:flex; align-items:center; gap:10px; margin:0 0 12px;
+      font-size:18px; font-weight:900;                /* bigger & bold */
     }
     .section-title::before{
-      content:""; width:6px; height:16px; border-radius:8px;
+      content:""; width:7px; height:18px; border-radius:8px;
       background: linear-gradient(180deg, var(--brand) 0%, var(--accent) 100%);
       display:inline-block;
     }
 
     /* Tables */
-    table { width:100%; border-collapse:separate; border-spacing:0; margin-top:6px; font-size:12px; }
+    table { width:100%; border-collapse:separate; border-spacing:0; margin-top:8px; font-size:14px; }
     thead th {
       background: linear-gradient(180deg, var(--thead) 0%, #e9efff 100%);
-      color:#1f2937; font-weight:700; letter-spacing:.2px;
+      color:#111827; font-weight:900; letter-spacing:.2px;
       border-top:1px solid var(--thead-border);
       border-bottom:1px solid var(--thead-border);
+      font-size:15px;                                      /* bigger head */
     }
-    th, td { padding:8px 8px; text-align:center; }
-    tbody td { border-bottom:1px solid var(--line); }
+    th, td { padding:10px 10px; text-align:center; }
+    tbody td { border-bottom:1px solid var(--line); font-weight:600; }
     tbody tr:nth-child(odd){ background: var(--stripe); }
     tbody tr:hover { background:#eef6ff; }
     table { border:1px solid var(--line); border-radius: 10px; overflow: hidden; }
@@ -102,36 +104,36 @@
     /* Report Header */
     .report-header {
       border:1px solid var(--line); border-radius: var(--radius);
-      padding:12px 16px; margin-bottom:12px; background:#fff; box-shadow: var(--shadow);
+      padding:14px 16px; margin-bottom:14px; background:#fff; box-shadow: var(--shadow);
     }
-    .header-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    .header-top img { max-height:50px; width:auto; }
+    .header-top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .header-top img { max-height:56px; width:auto; }
     .header-center { text-align:center; flex:1; }
-    .header-center h1 { margin:0; font-size:20px; font-weight:800; }
-    .header-center h3 { margin:4px 0 0; font-size:12px; font-weight:500; color:var(--muted); }
-    .header-center h2 { margin:6px 0 0; font-size:16px; font-weight:700; color:#111; }
+    .header-center h1 { margin:0; font-size:22px; font-weight:900; }
+    .header-center h3 { margin:4px 0 0; font-size:14px; font-weight:700; color:var(--muted); }
+    .header-center h2 { margin:6px 0 0; font-size:18px; font-weight:900; color:#111; }
     .header-bottom {
-      display:flex; flex-wrap:wrap; gap:8px 12px; justify-content:space-between;
-      font-size:12px; margin-top:8px; font-weight:600; color:#0b1324;
-      border-top:1px dashed var(--line); padding-top:8px;
+      display:flex; flex-wrap:wrap; gap:10px 14px; justify-content:space-between;
+      font-size:14px; margin-top:10px; font-weight:900; color:#0b1324;
+      border-top:1px dashed var(--line); padding-top:10px;
     }
 
     /* Report Footer */
     .report-footer {
       border:1px solid var(--line); border-radius: var(--radius);
-      padding:12px 16px; margin-top:12px; background:#fff; box-shadow: var(--shadow);
+      padding:14px 16px; margin-top:14px; background:#fff; box-shadow: var(--shadow);
     }
     .footer-section { margin-bottom:12px; }
-    .footer-label { font-weight:700; display:block; margin-bottom:6px; color:#111; }
-    .remarks-box { border:1px dashed var(--brand); min-height:40px; border-radius:10px; padding:6px 8px; outline:none; }
-    .signatures { display:flex; gap:16px; justify-content:space-between; margin-top:10px; }
+    .footer-label { font-weight:900; display:block; margin-bottom:8px; color:#111; font-size:16px; }
+    .remarks-box { border:1px dashed var(--brand); min-height:48px; border-radius:10px; padding:8px 10px; outline:none; font-size:15px; }
+    .signatures { display:flex; gap:18px; justify-content:space-between; margin-top:12px; }
     .signature { flex:1; }
-    .signature-label { font-weight:700; display:block; margin-bottom:8px; }
-    .signature-line { border-bottom:2px solid #0b1324; height:28px; border-radius:2px; }
+    .signature-label { font-weight:900; display:block; margin-bottom:8px; font-size:15px; }
+    .signature-line { border-bottom:2px solid #0b1324; height:30px; border-radius:2px; }
 
     /* Gauges */
-    .gauge-container { display:grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap:10px; }
-    .gauge-box { width:100%; height:200px; border:1px solid var(--line); border-radius:12px; padding:6px; background:#fff; }
+    .gauge-container { display:grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap:12px; }
+    .gauge-box { width:100%; height:210px; border:1px solid var(--line); border-radius:12px; padding:6px; background:#fff; }
     @media (max-width: 1100px){
       .gauge-container{ grid-template-columns: repeat(2, minmax(200px, 1fr)); }
     }
@@ -164,7 +166,7 @@
       <label for="operatorSelect">Operator</label>
       <select id="operatorSelect"><option value="">-- Select Operator --</option></select>
     </div>
-    <div style="display:flex; gap:8px; align-items:end;">
+    <div style="display:flex; gap:10px; align-items:end;">
       <button id="generateBtn">Generate</button>
       <button id="pdfBtn" class="secondary" title="Download as A4 PDF">Generate PDF</button>
     </div>
@@ -192,7 +194,6 @@
 
     <div id="errorBox" style="display:none" class="error"></div>
     <div id="reportOutput"></div>
-    <pre id="debugOutput" style="display:none"></pre>
 
     <!-- Footer -->
     <div class="report-footer">
@@ -230,7 +231,6 @@
     const status = document.getElementById('status');
     const reportOutput = document.getElementById('reportOutput');
     const errorBox = document.getElementById('errorBox');
-    const debugOutput = document.getElementById('debugOutput');
     const reportSection = document.getElementById('reportSection');
 
     /* ---------- Helpers ---------- */
@@ -314,8 +314,8 @@
         type: "indicator",
         mode: "gauge+number",
         value: Math.max(0, Math.min(100, Number(value) || 0)),
-        title: { text: title, font: { size: 14 } },
-        number: { suffix: "%" },
+        title: { text: title, font: { size: 16, family: 'Inter, Arial', color: '#0f172a' } },
+        number: { suffix: "%", font: { size: 18, family: 'Inter, Arial' } },
         gauge: {
           axis: { range: [0, 100], tickwidth: 1, tickcolor: "#444" },
           bar: { color: "#2563eb" },
@@ -334,7 +334,7 @@
           }
         }
       }];
-      const layout = { width: 240, height: 200, margin: { t: 18, r: 12, l: 12, b: 8 } };
+      const layout = { width: 260, height: 210, margin: { t: 20, r: 12, l: 12, b: 8 } };
       Plotly.newPlot(id, data, layout, {displayModeBar:false});
     }
 
@@ -342,7 +342,6 @@
     async function generateReport() {
       showError('');
       reportOutput.innerHTML = '';
-      debugOutput.style.display = 'none';
 
       const dateStr = datePicker.value;
       const operator = operatorSelect.value;
@@ -435,7 +434,7 @@
         for (const sku of Object.keys(skuAgg)) {
           const d = skuAgg[sku];
           html += `<tr>
-            <td style="font-weight:600">${sku}</td>
+            <td style="font-weight:900; text-align:left">${sku}</td>
             <td>${Number(d.production).toFixed(2)}</td>
             <td>${(Number(d.runtime) / 60).toFixed(2)}</td>
             <td>${(Number(d.downtime) / 60).toFixed(2)}</td>
@@ -502,8 +501,8 @@
         Object.entries(dtByReason).forEach(([reason,obj],i)=>{
           const dtId = `D-${String(101+i).padStart(3,'0')}`;
           dtRows += `<tr>
-            <td style="font-weight:600">${dtId}</td>
-            <td style="text-align:left">${reason}</td>
+            <td style="font-weight:900">${dtId}</td>
+            <td style="text-align:left; font-weight:800">${reason}</td>
             <td>${Number(obj.totalMin).toFixed(0)}</td>
             <td>${obj.occ}</td>
             <td>${Number.isFinite(obj.mtbf)? obj.mtbf.toFixed(0):'--'}</td>
@@ -527,7 +526,7 @@
                 ${dtRows || '<tr><td colspan="6" class="muted">No downtime events</td></tr>'}
               </tbody>
             </table>
-            <div class="small" style="margin-top:8px; color:#0b1324; font-weight:600;">
+            <div class="small" style="margin-top:8px; color:#0b1324; font-weight:900;">
               Overall Operator MTBF: <span style="color:var(--brand)">${Number.isFinite(overallMTBF)? overallMTBF.toFixed(0):'--'}</span> min
               &nbsp; | &nbsp;
               Overall Operator MTTR: <span style="color:var(--brand)">${Number.isFinite(overallMTTR)? overallMTTR.toFixed(0):'--'}</span> min
@@ -569,19 +568,19 @@
               </thead>
               <tbody>
                 <tr>
-                  <td style="text-align:left; font-weight:600">Runtime Consumption</td>
+                  <td style="text-align:left; font-weight:900">Runtime Consumption</td>
                   <td>${Number(runtimeKwh).toFixed(2)}</td>
                   <td>${Number.isFinite(runtimePct) ? runtimePct.toFixed(1) + '%' : '--'}</td>
                   <td>Productive Energy Use</td>
                 </tr>
                 <tr>
-                  <td style="text-align:left; font-weight:600">Downtime Consumption</td>
+                  <td style="text-align:left; font-weight:900">Downtime Consumption</td>
                   <td>${Number(downtimeKwh).toFixed(2)}</td>
                   <td>${Number.isFinite(downtimePct) ? downtimePct.toFixed(1) + '%' : '--'}</td>
                   <td>Energy Lost during Downtime</td>
                 </tr>
                 <tr>
-                  <td style="text-align:left; font-weight:600">Idle Consumption</td>
+                  <td style="text-align:left; font-weight:900">Idle Consumption</td>
                   <td>${Number(idleKwh).toFixed(2)}</td>
                   <td>${Number.isFinite(idlePct) ? idlePct.toFixed(1) + '%' : '--'}</td>
                   <td>Standby Loss</td>
@@ -615,9 +614,9 @@
 
         html += `<div class="card">
           <h3 class="section-title">5. Supervisor Insights</h3>
-          <p style="margin:.25rem 0">a: ${qualityText}</p>
-          <p style="margin:.25rem 0">b: ${downtimeText}</p>
-          <p style="margin:.25rem 0">c: ${oeeText}</p>
+          <p style="margin:.3rem 0; font-weight:800">a: ${qualityText}</p>
+          <p style="margin:.3rem 0; font-weight:800">b: ${downtimeText}</p>
+          <p style="margin:.3rem 0; font-weight:800">c: ${oeeText}</p>
         </div>`;
 
         // 6) Recommendations
@@ -647,7 +646,7 @@
 
         html += `<div class="card">
           <h3 class="section-title">6. Recommendations</h3>
-          <ul style="margin:0 0 0 16px; padding:0; line-height:1.5;">
+          <ul style="margin:0 0 0 18px; padding:0; line-height:1.6; font-weight:800;">
             <li>${recTextA}</li>
             <li>${recTextB}</li>
             <li>${recTextC}</li>
@@ -664,13 +663,6 @@
         renderGauge('gaugeAvail', Number.isFinite(avgAvail) ? avgAvail : 0, 'Availability');
         renderGauge('gaugeQuality', Number.isFinite(displayQuality) ? displayQuality : 0, 'Quality');
 
-        debugOutput.style.display = 'block';
-        debugOutput.textContent = `Averages computed from counts:
-deltaperformance → count=${cntPerf}
-deltaavailability → count=${cntAvail}
-deltaoee → count=${cntOee}
-deltaquality → count=${cntQualityDelta}`;
-
         setStatus(`Report ready — rows used: ${opRows.length}`);
       } catch (err) {
         showError(err.message || String(err));
@@ -684,42 +676,32 @@ deltaquality → count=${cntQualityDelta}`;
       try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'pt', 'a4'); // 595.28 x 841.89 pt
-        const report = document.getElementById('reportSection'); // only the report, not controls
+        const report = document.getElementById('reportSection');
 
-        // Render the report to canvas at high scale for sharpness
         const canvas = await html2canvas(report, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
 
-        // Target page size
-        const pageWidth = doc.internal.pageSize.getWidth();   // ~595
-        const pageHeight = doc.internal.pageSize.getHeight(); // ~842
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
 
-        // Original image size from canvas
         const imgPixelWidth = canvas.width;
         const imgPixelHeight = canvas.height;
 
-        // Convert canvas pixels to PDF points by scaling
-        // We'll scale the image to fit entirely within one page
         const imgRatio = imgPixelWidth / imgPixelHeight;
         const pageRatio = pageWidth / pageHeight;
 
         let renderWidth, renderHeight;
-
         if (imgRatio > pageRatio) {
-          // Image is “wider” -> fit to page width
           renderWidth = pageWidth;
           renderHeight = renderWidth / imgRatio;
         } else {
-          // Image is “taller” -> fit to page height
           renderHeight = pageHeight;
           renderWidth = renderHeight * imgRatio;
         }
 
-        // Center the image on the page
         const x = (pageWidth - renderWidth) / 2;
         const y = (pageHeight - renderHeight) / 2;
 
-        // Add single page with scaled image
         doc.addImage(imgData, 'PNG', x, y, renderWidth, renderHeight);
 
         const dateStr = (document.getElementById('headerDate').textContent || '').replace('Date: ','') || 'Report';
