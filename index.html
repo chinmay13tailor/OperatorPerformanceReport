@@ -32,9 +32,9 @@
     html, body { height: 100%; }
     body {
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
-      font-size: 16px;                 /* a bit bigger */
+      font-size: 16px;
       line-height: 1.45;
-      padding: 8px;                    /* tighter page padding */
+      padding: 8px;
       background: var(--panel);
       color: var(--ink);
     }
@@ -74,7 +74,7 @@
     }
     .section-title{
       display:flex; align-items:center; gap:10px; margin:0 0 10px;
-      font-size:18px; font-weight:900;                /* headings bold */
+      font-size:18px; font-weight:900;
     }
     .section-title::before{
       content:""; width:7px; height:18px; border-radius:8px;
@@ -86,14 +86,14 @@
     table { width:100%; border-collapse:separate; border-spacing:0; margin-top:6px; font-size:15px; }
     thead th {
       background: linear-gradient(180deg, var(--thead) 0%, #e9efff 100%);
-      color:#111827; font-weight:900;                 /* column headers bold */
+      color:#111827; font-weight:900;
       letter-spacing:.2px;
       border-top:1px solid var(--thead-border);
       border-bottom:1px solid var(--thead-border);
       font-size:16px;
     }
     th, td { padding:9px 9px; text-align:center; }
-    tbody td { border-bottom:1px solid var(--line); font-weight:400; }  /* body text normal */
+    tbody td { border-bottom:1px solid var(--line); font-weight:400; }
     tbody tr:nth-child(odd){ background: var(--stripe); }
     tbody tr:hover { background:#eef6ff; }
     table { border:1px solid var(--line); border-radius: 10px; overflow: hidden; }
@@ -174,7 +174,7 @@
   </div>
 
   <!-- Report Section -->
-  <div id="reportSection" style="display:none;">
+  <div id="reportSection" style="display:none; background:#fff;">
     <div class="report-header" id="reportHeader">
       <div class="header-top">
         <img src="PlantwizLogo.png" alt="Plantwiz Logo">
@@ -595,7 +595,7 @@
             </table>
           </div>`;
 
-        // 5) Supervisor Insights (paragraphs NOT bold)
+        // 5) Supervisor Insights
         const qualityPct = Number.isFinite(displayQuality) ? displayQuality.toFixed(1) : '--';
         const qualityText = `Quality Performance: ${operator} maintained a strong quality output of ${qualityPct}%, ensuring minimal defects despite operational challenges.`;
 
@@ -619,7 +619,7 @@
           <p style="margin:.3rem 0; font-weight:400">c: ${oeeText}</p>
         </div>`;
 
-        // 6) Recommendations (list NOT bold)
+        // 6) Recommendations
         let recTextA = 'Preventive Maintenance: No downtime data available.';
         let recTextB = 'Training Support: No downtime data available.';
         if (Object.keys(dtByReason).length) {
@@ -671,28 +671,38 @@
       }
     }
 
-    /* ---------- PDF Export (A4 FULL COVER — minimal margins) ---------- */
+    /* ---------- PDF Export: A4 LANDSCAPE, fit-to-width (no cropping) ---------- */
     async function generatePDF() {
       try {
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'pt', 'a4'); // 595.28 x 841.89 pt
+        const doc = new jsPDF('l', 'pt', 'a4');            // LANDSCAPE A4
         const report = document.getElementById('reportSection');
 
-        // render at high scale to keep text crisp
+        // High scale for crisp output
         const canvas = await html2canvas(report, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
 
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
+        const pageW = doc.internal.pageSize.getWidth();    // 842 pt (approx)
+        const pageH = doc.internal.pageSize.getHeight();   // 595 pt (approx)
 
-        const imgW = canvas.width, imgH = canvas.height;
+        const margin = 8;                                  // tight margins
+        const maxW = pageW - margin * 2;
+        const maxH = pageH - margin * 2;
 
-        // COVER strategy: fill whole page (may crop tiny edges) -> removes top/bottom spaces
-        const scale = Math.max(pageWidth / imgW, pageHeight / imgH);
-        const renderW = imgW * scale;
-        const renderH = imgH * scale;
-        const x = (pageWidth - renderW) / 2;
-        const y = (pageHeight - renderH) / 2;
+        // PRIORITY: fit width first
+        let ratio = maxW / canvas.width;
+        let renderW = canvas.width * ratio;
+        let renderH = canvas.height * ratio;
+
+        // If height overflows, fallback to fit-height
+        if (renderH > maxH) {
+          ratio = maxH / canvas.height;
+          renderW = canvas.width * ratio;
+          renderH = canvas.height * ratio;
+        }
+
+        const x = margin;                                  // anchor to margins (no big borders)
+        const y = margin;
 
         doc.addImage(imgData, 'PNG', x, y, renderW, renderH);
 
