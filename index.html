@@ -367,6 +367,33 @@
             </table>
           </div>`;
 
+        // 5) Supervisor Insights
+        // a: Quality Performance
+        const qualityPct = Number.isFinite(displayQuality) ? displayQuality.toFixed(1) : '--';
+        const qualityText = `Quality Performance: ${operator} maintained a strong quality output of ${qualityPct}%, ensuring minimal defects despite operational challenges.`;
+
+        // b: Downtime Analysis (pick top reason by occurrences)
+        let downtimeText = 'Downtime Analysis: No downtime events recorded.';
+        if (Object.keys(dtByReason).length) {
+          let top = Object.entries(dtByReason).sort((a,b)=>b[1].occ - a[1].occ)[0];
+          const reason = top[0];
+          const occ = top[1].occ;
+          const mtbfTop = Number.isFinite(top[1].mtbf)? top[1].mtbf.toFixed(0):'--';
+          const mttrTop = Number.isFinite(top[1].mttr)? top[1].mttr.toFixed(0):'--';
+          downtimeText = `Downtime Analysis: Majority of downtime events were due to ${reason} (${occ} occurrences). MTBF = ${mtbfTop} min | MTTR = ${mttrTop} min. However, recurrence indicates the need for preventive maintenance checks.`;
+        }
+
+        // c: OEE Review
+        const oeePct = Number.isFinite(avgOee) ? avgOee.toFixed(1) : '--';
+        const oeeText = `OEE Review: Current OEE stands at ${oeePct}%, which is fair but can be further improved, particularly by addressing downtime reduction in SKU-B production.`;
+
+        html += `<div class=\"card\">
+          <h3>Supervisor Insights</h3>
+          <p>a: ${qualityText}</p>
+          <p>b: ${downtimeText}</p>
+          <p>c: ${oeeText}</p>
+        </div>`;
+
         reportOutput.innerHTML = html;
 
         debugOutput.style.display = 'block';
