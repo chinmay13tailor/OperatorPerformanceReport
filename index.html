@@ -74,7 +74,8 @@
       "SKU","Operator_Name","Downtime_Submit","Downtime_Duration","Downtime_Reason_Code",
       "Machine_Speed","Standard_Speed","Runtime","Downtime","Idletime",
       "deltaperformance","deltaavailability","deltaoee","deltaquality",
-      "Good_Production","Planned_Production","Planned_Production_Time"
+      "Good_Production","Planned_Production","Planned_Production_Time",
+      "Per_Min_Consumption"
     ];
     const KEYS_PARAM = KEYS_LIST.join(',');
 
@@ -278,7 +279,7 @@
         });
 
         html += `
-          <div class="card">
+          <div class=\"card\">
             <h3>Alarms & Downtimes During Operation</h3>
             <h4>Downtime Summary</h4>
             <table>
@@ -291,14 +292,79 @@
                 <th>MTTR (min)</th>
               </tr></thead>
               <tbody>
-                ${dtRows || '<tr><td colspan="6" class="muted">No downtime events</td></tr>'}
+                ${dtRows || '<tr><td colspan=\"6\" class=\"muted\">No downtime events</td></tr>'}
               </tbody>
             </table>
-            <div class="small muted" style="margin-top:6px">
+            <div class=\"small muted\" style=\"margin-top:6px\">
               Overall Operator MTBF: ${Number.isFinite(overallMTBF)? overallMTBF.toFixed(0):'--'} min
               &nbsp; | &nbsp;
               Overall Operator MTTR: ${Number.isFinite(overallMTTR)? overallMTTR.toFixed(0):'--'} min
             </div>
+          </div>`;
+
+        // 4) Energy Consumption & Losses
+        let runtimeKwh = 0, downtimeKwh = 0, idleKwh = 0, totalKwh = 0;
+        opRows.forEach(r => {
+          const cons = safeNum(r.Per_Min_Consumption);
+          if (!Number.isFinite(cons)) return;
+          totalKwh += cons;
+          const rtFlag = safeNum(r.Runtime) === 1;
+          const dtFlag = safeNum(r.Downtime) === 1;
+          const idFlag = safeNum(r.Idletime) === 1;
+          if (rtFlag) runtimeKwh += cons;
+          else if (dtFlag) downtimeKwh += cons;
+          else if (idFlag) idleKwh += cons;
+        });
+        // If any minutes are unclassified, ensure total still equals the sum of buckets
+        const bucketSum = runtimeKwh + downtimeKwh + idleKwh;
+        if (Number.isFinite(totalKwh) && Math.abs(totalKwh - bucketSum) > 1e-6) {
+          // Force total to the bucket sum so percentages align with displayed rows
+          totalKwh = bucketSum;
+        }
+        const pct = (val, total) => (Number.isFinite(val) && total > 0) ? ((val/total)*100) : NaN;
+        const runtimePct = pct(runtimeKwh, totalKwh);
+        const downtimePct = pct(downtimeKwh, totalKwh);
+        const idlePct = pct(idleKwh, totalKwh);
+
+        html += `
+          <div class=\"card\">
+            <h3>Energy Consumption & Losses</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Energy Consumed (kWh)</th>
+                  <th>% of Total Consumption</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Runtime Consumption</td>
+                  <td>${Number(runtimeKwh).toFixed(2)}</td>
+                  <td>${Number.isFinite(runtimePct) ? runtimePct.toFixed(1) + '%' : '--'}</td>
+                  <td>Productive Energy Use</td>
+                </tr>
+                <tr>
+                  <td>Downtime Consumption</td>
+                  <td>${Number(downtimeKwh).toFixed(2)}</td>
+                  <td>${Number.isFinite(downtimePct) ? downtimePct.toFixed(1) + '%' : '--'}</td>
+                  <td>Energy Lost during Downtime</td>
+                </tr>
+                <tr>
+                  <td>Idle Consumption</td>
+                  <td>${Number(idleKwh).toFixed(2)}</td>
+                  <td>${Number.isFinite(idlePct) ? idlePct.toFixed(1) + '%' : '--'}</td>
+                  <td>Standby Loss</td>
+                </tr>
+                <tr>
+                  <th>Total</th>
+                  <th>${Number(totalKwh).toFixed(2)}</th>
+                  <th>100%</th>
+                  <th>-</th>
+                </tr>
+              </tbody>
+            </table>
           </div>`;
 
         reportOutput.innerHTML = html;
