@@ -302,7 +302,7 @@
         let html = '';
 
         // 1) Production Details (SKU-wise)
-        html += `<div class="card"><h3>2. Production Details (SKU-wise)</h3>`;
+        html += `<div class="card"><h3>Production Details (SKU-wise)</h3>`;
         html += `<table><thead><tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th></tr></thead><tbody>`;
         for (const sku of Object.keys(skuAgg)) {
           const d = skuAgg[sku];
@@ -317,7 +317,7 @@
         html += `</tbody></table></div>`;
 
         // 2) Machine Performance Summary (with your table layout)
-        html += `<div class="card"><h3>3. Machine Performance Summary</h3>`;
+        html += `<div class="card"><h3>Machine Performance Summary</h3>`;
         html += `<table class="perf-summary"><thead><tr><th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th></tr></thead><tbody>`;
         html += `<tr>
           <td>${Number.isFinite(avgOee) ? avgOee.toFixed(2) + '%' : '--'}</td>
@@ -387,7 +387,7 @@
 
         html += `
           <div class="card">
-            <h3>4. Alarms & Downtimes During Operation</h3>
+            <h3>Downtimes During Operation</h3>
             <h4>Downtime Summary</h4>
             <table>
               <thead><tr>
@@ -433,7 +433,7 @@
 
         html += `
           <div class="card">
-            <h3>5. Energy Consumption & Losses</h3>
+            <h3>Energy Consumption & Losses</h3>
             <table>
               <thead>
                 <tr>
@@ -490,7 +490,7 @@
         const oeeText = `OEE Review: Current OEE stands at ${oeePct}%, which is fair but can be further improved, particularly by addressing downtime reduction in SKU-B production.`;
 
         html += `<div class="card">
-          <h3>6. Supervisor Insights</h3>
+          <h3>Supervisor Insights</h3>
           <p>a: ${qualityText}</p>
           <p>b: ${downtimeText}</p>
           <p>c: ${oeeText}</p>
@@ -522,7 +522,7 @@
         const recTextD = `OEE Improvement Plan: Current bottleneck is ${weakest || '—'}. Set a target to improve OEE from ${Number.isFinite(avgOee)? avgOee.toFixed(1):'77.7'}% to ${oeeImproveTarget}%+ by improving ${weakest || 'the weakest KPI'}.`;
 
         html += `<div class="card">
-          <h3>7. Recommendations</h3>
+          <h3>Recommendations</h3>
           <p>a: ${recTextA}</p>
           <p>b: ${recTextB}</p>
           <p>c: ${recTextC}</p>
