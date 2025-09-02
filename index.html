@@ -19,9 +19,42 @@
     .small { font-size:12px; color:#6b7280; }
     pre { background:#f3f4f6; padding:8px; border-radius:6px; overflow:auto; max-height:180px; }
     .error { color:#991b1b; background:#fff1f2; padding:8px; border-radius:6px; border:1px solid #fecaca; margin-top:8px; }
+
+    .report-header {
+      border:1px solid #000;
+      border-radius:6px;
+      padding:10px 20px;
+      margin-bottom:20px;
+      background:#fff;
+    }
+    .header-top { display:flex; justify-content:space-between; align-items:center; }
+    .header-top img { max-height:60px; width:auto; }
+    .header-center { text-align:center; flex:1; }
+    .header-center h1 { margin:0; font-size:22px; font-weight:bold; }
+    .header-center h3 { margin:4px 0 0; font-size:14px; font-weight:normal; }
+    .header-bottom { display:flex; justify-content:space-between; font-size:13px; margin-top:6px; font-weight:bold; }
   </style>
 </head>
 <body>
+
+  <!-- Report Header -->
+  <div class="report-header" id="reportHeader" style="display:none;">
+    <div class="header-top">
+      <img src="PlantwizLogo.png" alt="Plantwiz Logo">
+      <div class="header-center">
+        <h1>Pima Controls Pvt. Ltd</h1>
+        <h3>Block No.298, Nr.Bacha Motors, Sanathal Cross Road, Ahmedabad(382210)</h3>
+        <h2>Operator Performance Report</h2>
+      </div>
+      <img src="PimaLogo.png" alt="Pima Logo">
+    </div>
+    <div class="header-bottom">
+      <span id="headerDate">Date: --</span>
+      <span id="headerOperator">Operator Name: --</span>
+      <span id="generatedDate">Report Generated ON: --</span>
+    </div>
+  </div>
+
   <h2>Operator Performance Report</h2>
   <div class="controls">
     <label for="datePicker">Date</label>
@@ -37,13 +70,11 @@
   <pre id="debugOutput" style="display:none"></pre>
 
   <script>
-    /* ---------- Configuration ---------- */
     const DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
     const API_BASE = "https://plantwiz.pimateck.in/api";
     const qs = new URLSearchParams(window.location.search);
     const TOKEN = qs.get('token') || "";
 
-    /* ---------- DOM ---------- */
     const datePicker = document.getElementById('datePicker');
     const operatorSelect = document.getElementById('operatorSelect');
     const btnGenerate = document.getElementById('generateBtn');
@@ -52,14 +83,13 @@
     const errorBox = document.getElementById('errorBox');
     const debugOutput = document.getElementById('debugOutput');
 
-    /* ---------- Helpers ---------- */
     function showError(msg) {
       if (!msg) { errorBox.style.display = 'none'; errorBox.textContent = ''; return; }
       errorBox.style.display = 'block'; errorBox.textContent = msg;
     }
     function setStatus(txt) { status.textContent = txt || ''; }
     function safeNum(v) {
-      if (v === undefined || v === null || v === "") return NaN;
+      if (v === undefined || v === null) return NaN;
       const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', ''));
       return Number.isFinite(n) ? n : NaN;
     }
@@ -69,7 +99,6 @@
       return d.getTime();
     }
 
-    /* ---------- Telemetry keys ---------- */
     const KEYS_LIST = [
       "SKU","Operator_Name","Downtime_Submit","Downtime_Duration","Downtime_Reason_Code",
       "Machine_Speed","Standard_Speed","Runtime","Downtime","Idletime",
@@ -79,7 +108,6 @@
     ];
     const KEYS_PARAM = KEYS_LIST.join(',');
 
-    /* ---------- Fetch timeseries ---------- */
     async function fetchTelemetryForDate(dateStr) {
       if (!TOKEN) throw new Error("Missing token in URL (?token=YOUR_JWT)");
       const start = new Date(dateStr + "T00:00:00").getTime();
@@ -93,7 +121,6 @@
       return res.json();
     }
 
-    /* ---------- Build rows ---------- */
     function buildRowsFromTimeseries(tsObj) {
       const map = new Map();
       Object.entries(tsObj || {}).forEach(([key, arr])=>{
@@ -107,7 +134,6 @@
       return Array.from(map.values()).sort((a,b)=>a.ts-b.ts);
     }
 
-    /* ---------- Load operators ---------- */
     async function loadOperators(dateStr) {
       try {
         showError('');
@@ -127,7 +153,6 @@
       }
     }
 
-    /* ---------- Generate report ---------- */
     async function generateReport() {
       showError('');
       reportOutput.innerHTML = '';
@@ -138,7 +163,12 @@
       if (!dateStr) { showError('Please select a date.'); return; }
       if (!operator) { showError('Please select an operator.'); return; }
 
-      try {
+      document.getElementById('reportHeader').style.display = 'block';
+      document.getElementById('headerDate').textContent = `Date: ${dateStr}`;
+      document.getElementById('headerOperator').textContent = `Operator Name: ${operator}`;
+      document.getElementById('generatedDate').textContent = `Report Generated ON: ${new Date().toLocaleString()}`;
+
+            try {
         setStatus('Fetching telemetry and computing report…');
         const ts = await fetchTelemetryForDate(dateStr);
         const rows = buildRowsFromTimeseries(ts);
@@ -279,7 +309,7 @@
         });
 
         html += `
-          <div class=\"card\">
+          <div class="card">
             <h3>Alarms & Downtimes During Operation</h3>
             <h4>Downtime Summary</h4>
             <table>
@@ -292,10 +322,10 @@
                 <th>MTTR (min)</th>
               </tr></thead>
               <tbody>
-                ${dtRows || '<tr><td colspan=\"6\" class=\"muted\">No downtime events</td></tr>'}
+                ${dtRows || '<tr><td colspan="6" class="muted">No downtime events</td></tr>'}
               </tbody>
             </table>
-            <div class=\"small muted\" style=\"margin-top:6px\">
+            <div class="small muted" style="margin-top:6px">
               Overall Operator MTBF: ${Number.isFinite(overallMTBF)? overallMTBF.toFixed(0):'--'} min
               &nbsp; | &nbsp;
               Overall Operator MTTR: ${Number.isFinite(overallMTTR)? overallMTTR.toFixed(0):'--'} min
@@ -315,10 +345,8 @@
           else if (dtFlag) downtimeKwh += cons;
           else if (idFlag) idleKwh += cons;
         });
-        // If any minutes are unclassified, ensure total still equals the sum of buckets
         const bucketSum = runtimeKwh + downtimeKwh + idleKwh;
         if (Number.isFinite(totalKwh) && Math.abs(totalKwh - bucketSum) > 1e-6) {
-          // Force total to the bucket sum so percentages align with displayed rows
           totalKwh = bucketSum;
         }
         const pct = (val, total) => (Number.isFinite(val) && total > 0) ? ((val/total)*100) : NaN;
@@ -327,7 +355,7 @@
         const idlePct = pct(idleKwh, totalKwh);
 
         html += `
-          <div class=\"card\">
+          <div class="card">
             <h3>Energy Consumption & Losses</h3>
             <table>
               <thead>
@@ -368,11 +396,9 @@
           </div>`;
 
         // 5) Supervisor Insights
-        // a: Quality Performance
         const qualityPct = Number.isFinite(displayQuality) ? displayQuality.toFixed(1) : '--';
         const qualityText = `Quality Performance: ${operator} maintained a strong quality output of ${qualityPct}%, ensuring minimal defects despite operational challenges.`;
 
-        // b: Downtime Analysis (pick top reason by occurrences)
         let downtimeText = 'Downtime Analysis: No downtime events recorded.';
         if (Object.keys(dtByReason).length) {
           let top = Object.entries(dtByReason).sort((a,b)=>b[1].occ - a[1].occ)[0];
@@ -383,11 +409,10 @@
           downtimeText = `Downtime Analysis: Majority of downtime events were due to ${reason} (${occ} occurrences). MTBF = ${mtbfTop} min | MTTR = ${mttrTop} min. However, recurrence indicates the need for preventive maintenance checks.`;
         }
 
-        // c: OEE Review
         const oeePct = Number.isFinite(avgOee) ? avgOee.toFixed(1) : '--';
         const oeeText = `OEE Review: Current OEE stands at ${oeePct}%, which is fair but can be further improved, particularly by addressing downtime reduction in SKU-B production.`;
 
-        html += `<div class=\"card\">
+        html += `<div class="card">
           <h3>Supervisor Insights</h3>
           <p>a: ${qualityText}</p>
           <p>b: ${downtimeText}</p>
@@ -395,7 +420,6 @@
         </div>`;
 
         // 6) Recommendations
-        // a: Preventive Maintenance for most occurred downtime
         let recTextA = 'Preventive Maintenance: No downtime data available.';
         let recTextB = 'Training Support: No downtime data available.';
         if (Object.keys(dtByReason).length) {
@@ -405,24 +429,22 @@
           recTextB = `Training Support: Provide ${operator} with quick-resolution protocols for handling '${reason}' issues, reducing reliance on maintenance.`;
         }
 
-        // c: SKU with maximum downtime
-        let recTextC = 'SKU-B Focus: No SKU downtime data available.';
+        let recTextC = 'SKU Focus: No SKU downtime data available.';
         if (Object.keys(skuAgg).length) {
           let skuDowntimeSorted = Object.entries(skuAgg).sort((a,b)=>b[1].downtime - a[1].downtime)[0];
           const skuName = skuDowntimeSorted[0];
           recTextC = `SKU Focus: Investigate ${skuName} production processes to identify specific bottlenecks causing downtime and optimize machine settings/preparations.`;
         }
 
-        // d: OEE Improvement Plan - decide weakest factor
         let weakest = '';
         let val = Infinity;
         if (Number.isFinite(avgAvail) && avgAvail < val) { weakest = 'Availability'; val = avgAvail; }
         if (Number.isFinite(avgPerf) && avgPerf < val) { weakest = 'Performance'; val = avgPerf; }
         if (Number.isFinite(displayQuality) && displayQuality < val) { weakest = 'Quality'; val = displayQuality; }
         const oeeImproveTarget = Number.isFinite(avgOee)? (avgOee+5).toFixed(1):'82';
-        const recTextD = `OEE Improvement Plan: Current bottleneck is ${weakest}. Set a target to improve OEE from ${Number.isFinite(avgOee)? avgOee.toFixed(1):'77.7'}% to ${oeeImproveTarget}%+ by improving ${weakest}.`;
+        const recTextD = `OEE Improvement Plan: Current bottleneck is ${weakest || '—'}. Set a target to improve OEE from ${Number.isFinite(avgOee)? avgOee.toFixed(1):'77.7'}% to ${oeeImproveTarget}%+ by improving ${weakest || 'the weakest KPI'}.`;
 
-        html += `<div class=\"card\">
+        html += `<div class="card">
           <h3>Recommendations</h3>
           <p>a: ${recTextA}</p>
           <p>b: ${recTextB}</p>
@@ -433,10 +455,14 @@
         reportOutput.innerHTML = html;
 
         debugOutput.style.display = 'block';
-        debugOutput.textContent = `Averages computed from counts:\n`+
-          `deltaperformance → count=${cntPerf}\n`+
-          `deltaavailability → count=${cntAvail}\n`+
-          `deltaoee → count=${cntOee}\n`+
+        debugOutput.textContent = `Averages computed from counts:
+`+
+          `deltaperformance → count=${cntPerf}
+`+
+          `deltaavailability → count=${cntAvail}
+`+
+          `deltaoee → count=${cntOee}
+`+
           `deltaquality → count=${cntQualityDelta}`;
 
         setStatus(`Report ready — rows used: ${opRows.length}`);
@@ -445,9 +471,9 @@
         setStatus('');
         console.error(err);
       }
+
     }
 
-    /* ---------- Event bindings ---------- */
     datePicker.addEventListener('change', () => {
       setStatus('');
       showError('');
