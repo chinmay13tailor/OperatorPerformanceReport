@@ -11,6 +11,7 @@
     input[type="date"], select { padding:8px 10px; border-radius:6px; border:1px solid #d1d5db; }
     button { padding:9px 12px; background:#2563eb; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600; }
     button:disabled { opacity:.6; cursor:not-allowed; }
+
     .card { background: #fff; padding:14px; border-radius:10px; border:1px solid #e6e9ef; margin-bottom:14px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
     th, td { padding:8px; border:1px solid #e6e9ef; text-align:center; }
@@ -20,6 +21,7 @@
     pre { background:#f3f4f6; padding:8px; border-radius:6px; overflow:auto; max-height:180px; }
     .error { color:#991b1b; background:#fff1f2; padding:8px; border-radius:6px; border:1px solid #fecaca; margin-top:8px; }
 
+    /* Report Header (rendered inside report section) */
     .report-header {
       border:1px solid #000;
       border-radius:6px;
@@ -32,30 +34,13 @@
     .header-center { text-align:center; flex:1; }
     .header-center h1 { margin:0; font-size:22px; font-weight:bold; }
     .header-center h3 { margin:4px 0 0; font-size:14px; font-weight:normal; }
+    .header-center h2 { margin:6px 0 0; font-size:18px; font-weight:bold; }
     .header-bottom { display:flex; justify-content:space-between; font-size:13px; margin-top:6px; font-weight:bold; }
   </style>
 </head>
 <body>
 
-  <!-- Report Header -->
-  <div class="report-header" id="reportHeader" style="display:none;">
-    <div class="header-top">
-      <img src="PlantwizLogo.png" alt="Plantwiz Logo">
-      <div class="header-center">
-        <h1>Pima Controls Pvt. Ltd</h1>
-        <h3>Block No.298, Nr.Bacha Motors, Sanathal Cross Road, Ahmedabad(382210)</h3>
-        <h2>Operator Performance Report</h2>
-      </div>
-      <img src="PimaLogo.png" alt="Pima Logo">
-    </div>
-    <div class="header-bottom">
-      <span id="headerDate">Date: --</span>
-      <span id="headerOperator">Operator Name: --</span>
-      <span id="generatedDate">Report Generated ON: --</span>
-    </div>
-  </div>
-
-  <h2>Operator Performance Report</h2>
+  <!-- Date Selection Section -->
   <div class="controls">
     <label for="datePicker">Date</label>
     <input id="datePicker" type="date" />
@@ -65,16 +50,38 @@
     <div id="status" class="small muted" style="margin-left:12px"></div>
   </div>
 
-  <div id="errorBox" style="display:none" class="error"></div>
-  <div id="reportOutput"></div>
-  <pre id="debugOutput" style="display:none"></pre>
+  <!-- Report Section -->
+  <div id="reportSection" style="display:none;">
+    <div class="report-header" id="reportHeader">
+      <div class="header-top">
+        <img src="PlantwizLogo.png" alt="Plantwiz Logo">
+        <div class="header-center">
+          <h1>Pima Controls Pvt. Ltd</h1>
+          <h3>Block No.298, Nr.Bacha Motors, Sanathal Cross Road, Ahmedabad(382210)</h3>
+          <h2>Operator Performance Report</h2>
+        </div>
+        <img src="PimaLogo.png" alt="Pima Logo">
+      </div>
+      <div class="header-bottom">
+        <span id="headerDate">Date: --</span>
+        <span id="headerOperator">Operator Name: --</span>
+        <span id="generatedDate">Report Generated ON: --</span>
+      </div>
+    </div>
+
+    <div id="errorBox" style="display:none" class="error"></div>
+    <div id="reportOutput"></div>
+    <pre id="debugOutput" style="display:none"></pre>
+  </div>
 
   <script>
+    /* ---------- Configuration ---------- */
     const DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
     const API_BASE = "https://plantwiz.pimateck.in/api";
     const qs = new URLSearchParams(window.location.search);
     const TOKEN = qs.get('token') || "";
 
+    /* ---------- DOM ---------- */
     const datePicker = document.getElementById('datePicker');
     const operatorSelect = document.getElementById('operatorSelect');
     const btnGenerate = document.getElementById('generateBtn');
@@ -82,7 +89,9 @@
     const reportOutput = document.getElementById('reportOutput');
     const errorBox = document.getElementById('errorBox');
     const debugOutput = document.getElementById('debugOutput');
+    const reportSection = document.getElementById('reportSection');
 
+    /* ---------- Helpers ---------- */
     function showError(msg) {
       if (!msg) { errorBox.style.display = 'none'; errorBox.textContent = ''; return; }
       errorBox.style.display = 'block'; errorBox.textContent = msg;
@@ -99,6 +108,7 @@
       return d.getTime();
     }
 
+    /* ---------- Telemetry keys ---------- */
     const KEYS_LIST = [
       "SKU","Operator_Name","Downtime_Submit","Downtime_Duration","Downtime_Reason_Code",
       "Machine_Speed","Standard_Speed","Runtime","Downtime","Idletime",
@@ -108,6 +118,7 @@
     ];
     const KEYS_PARAM = KEYS_LIST.join(',');
 
+    /* ---------- Fetch timeseries ---------- */
     async function fetchTelemetryForDate(dateStr) {
       if (!TOKEN) throw new Error("Missing token in URL (?token=YOUR_JWT)");
       const start = new Date(dateStr + "T00:00:00").getTime();
@@ -121,6 +132,7 @@
       return res.json();
     }
 
+    /* ---------- Build rows ---------- */
     function buildRowsFromTimeseries(tsObj) {
       const map = new Map();
       Object.entries(tsObj || {}).forEach(([key, arr])=>{
@@ -134,6 +146,7 @@
       return Array.from(map.values()).sort((a,b)=>a.ts-b.ts);
     }
 
+    /* ---------- Load operators ---------- */
     async function loadOperators(dateStr) {
       try {
         showError('');
@@ -153,6 +166,7 @@
       }
     }
 
+    /* ---------- Generate report ---------- */
     async function generateReport() {
       showError('');
       reportOutput.innerHTML = '';
@@ -163,16 +177,18 @@
       if (!dateStr) { showError('Please select a date.'); return; }
       if (!operator) { showError('Please select an operator.'); return; }
 
-      document.getElementById('reportHeader').style.display = 'block';
+      // Show report shell & fill header
+      reportSection.style.display = 'block';
       document.getElementById('headerDate').textContent = `Date: ${dateStr}`;
       document.getElementById('headerOperator').textContent = `Operator Name: ${operator}`;
       document.getElementById('generatedDate').textContent = `Report Generated ON: ${new Date().toLocaleString()}`;
 
-            try {
+      try {
         setStatus('Fetching telemetry and computing report…');
         const ts = await fetchTelemetryForDate(dateStr);
         const rows = buildRowsFromTimeseries(ts);
 
+        // Filter rows for the selected operator
         const opRows = rows.filter(r => {
           const v = r.Operator_Name === undefined || r.Operator_Name === null ? '' : String(r.Operator_Name).trim();
           return v === operator;
@@ -184,6 +200,7 @@
           return;
         }
 
+        // Aggregations
         const skuAgg = {};
         let totalRuntime = 0, totalDowntime = 0, totalIdle = 0;
         let actualProduction = 0, goodProduction = 0, plannedProduction = 0, plannedTime = 0;
@@ -202,23 +219,23 @@
 
           if (!skuAgg[sku]) skuAgg[sku] = { production: 0, runtime: 0, downtime: 0, idletime: 0 };
           skuAgg[sku].production += Number.isFinite(ms) ? ms : 0;
-          skuAgg[sku].runtime += Number.isFinite(rt) ? rt : 0;
-          skuAgg[sku].downtime += Number.isFinite(dt) ? dt : 0;
-          skuAgg[sku].idletime += Number.isFinite(it) ? it : 0;
+          skuAgg[sku].runtime   += Number.isFinite(rt) ? rt : 0;
+          skuAgg[sku].downtime  += Number.isFinite(dt) ? dt : 0;
+          skuAgg[sku].idletime  += Number.isFinite(it) ? it : 0;
 
-          totalRuntime += Number.isFinite(rt) ? rt : 0;
-          totalDowntime += Number.isFinite(dt) ? dt : 0;
-          totalIdle += Number.isFinite(it) ? it : 0;
+          totalRuntime   += Number.isFinite(rt) ? rt : 0;
+          totalDowntime  += Number.isFinite(dt) ? dt : 0;
+          totalIdle      += Number.isFinite(it) ? it : 0;
 
-          actualProduction += Number.isFinite(ms) ? ms : 0;
-          goodProduction += Number.isFinite(safeNum(r.Good_Production)) ? safeNum(r.Good_Production) : 0;
-          plannedProduction += Number.isFinite(stdSpeed) ? stdSpeed : 0;
-          plannedTime = Number.isFinite(safeNum(r.Planned_Production_Time)) ? safeNum(r.Planned_Production_Time) : plannedTime;
+          actualProduction   += Number.isFinite(ms) ? ms : 0;
+          goodProduction     += Number.isFinite(safeNum(r.Good_Production)) ? safeNum(r.Good_Production) : 0;
+          plannedProduction  += Number.isFinite(stdSpeed) ? stdSpeed : 0;
+          plannedTime         = Number.isFinite(safeNum(r.Planned_Production_Time)) ? safeNum(r.Planned_Production_Time) : plannedTime;
 
-          const dp = safeNum(r.deltaperformance); if (Number.isFinite(dp)) { sumPerf += dp; cntPerf++; }
-          const da = safeNum(r.deltaavailability); if (Number.isFinite(da)) { sumAvail += da; cntAvail++; }
-          const doee = safeNum(r.deltaoee); if (Number.isFinite(doee)) { sumOee += doee; cntOee++; }
-          const dq = safeNum(r.deltaquality); if (Number.isFinite(dq)) { sumQualityDelta += dq; cntQualityDelta++; }
+          const dp  = safeNum(r.deltaperformance);  if (Number.isFinite(dp))  { sumPerf += dp;  cntPerf++; }
+          const da  = safeNum(r.deltaavailability); if (Number.isFinite(da))  { sumAvail += da; cntAvail++; }
+          const doee= safeNum(r.deltaoee);          if (Number.isFinite(doee)){ sumOee += doee; cntOee++; }
+          const dq  = safeNum(r.deltaquality);      if (Number.isFinite(dq))  { sumQualityDelta += dq; cntQualityDelta++; }
         });
 
         const avgPerf = cntPerf ? (sumPerf / cntPerf) : NaN;
@@ -228,9 +245,10 @@
         const computedQualityPct = actualProduction ? (goodProduction / actualProduction * 100) : NaN;
         const displayQuality = Number.isFinite(avgQualityDelta) ? avgQualityDelta : computedQualityPct;
 
+        // ---------- Build HTML ----------
         let html = '';
 
-        // 1) Production Details
+        // 1) Production Details (SKU-wise)
         html += `<div class="card"><h3>Production Details (SKU-wise)</h3>`;
         html += `<table><thead><tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th></tr></thead><tbody>`;
         for (const sku of Object.keys(skuAgg)) {
@@ -276,8 +294,7 @@
           if (submit === 1) {
             const reason = r.Downtime_Reason_Code ? String(r.Downtime_Reason_Code).trim() : 'UNKNOWN';
             let durMin = safeNum(r.Downtime_Duration);
-            // convert SECONDS -> MINUTES
-            durMin = Number.isFinite(durMin) ? (durMin / 60) : durMin;
+            durMin = Number.isFinite(durMin) ? (durMin / 60) : durMin; // seconds → minutes
             if (!dtByReason[reason]) dtByReason[reason] = { occ: 0, totalMin: 0, mttrSamples: [] };
             dtByReason[reason].occ += 1;
             if (Number.isFinite(durMin)) {
@@ -332,7 +349,7 @@
             </div>
           </div>`;
 
-        // 4) Energy Consumption & Losses
+        // 4) Energy Consumption & Losses (Per_Min_Consumption split by flags)
         let runtimeKwh = 0, downtimeKwh = 0, idleKwh = 0, totalKwh = 0;
         opRows.forEach(r => {
           const cons = safeNum(r.Per_Min_Consumption);
@@ -347,7 +364,7 @@
         });
         const bucketSum = runtimeKwh + downtimeKwh + idleKwh;
         if (Number.isFinite(totalKwh) && Math.abs(totalKwh - bucketSum) > 1e-6) {
-          totalKwh = bucketSum;
+          totalKwh = bucketSum; // force alignment so % add to 100
         }
         const pct = (val, total) => (Number.isFinite(val) && total > 0) ? ((val/total)*100) : NaN;
         const runtimePct = pct(runtimeKwh, totalKwh);
@@ -452,18 +469,15 @@
           <p>d: ${recTextD}</p>
         </div>`;
 
+        // Render built HTML
         reportOutput.innerHTML = html;
 
         debugOutput.style.display = 'block';
         debugOutput.textContent = `Averages computed from counts:
-`+
-          `deltaperformance → count=${cntPerf}
-`+
-          `deltaavailability → count=${cntAvail}
-`+
-          `deltaoee → count=${cntOee}
-`+
-          `deltaquality → count=${cntQualityDelta}`;
+deltaperformance → count=${cntPerf}
+deltaavailability → count=${cntAvail}
+deltaoee → count=${cntOee}
+deltaquality → count=${cntQualityDelta}`;
 
         setStatus(`Report ready — rows used: ${opRows.length}`);
       } catch (err) {
@@ -471,9 +485,9 @@
         setStatus('');
         console.error(err);
       }
-
     }
 
+    /* ---------- Events ---------- */
     datePicker.addEventListener('change', () => {
       setStatus('');
       showError('');
