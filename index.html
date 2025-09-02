@@ -4,8 +4,13 @@
   <meta charset="utf-8" />
   <title>Operator Performance Report</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+
   <!-- Gauges -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <!-- PDF export deps -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <style>
     body { font-family: Arial, Helvetica, sans-serif; padding: 18px; background:#f7fafc; color:#111; }
     h2 { margin: 0 0 12px; }
@@ -52,6 +57,13 @@
     @media (max-width: 560px){
       .gauge-container{ grid-template-columns: 1fr; }
     }
+
+    /* Print-friendly (helps html2canvas produce crisp A4 pages) */
+    @media print {
+      body { background:#fff; }
+      .controls { display:none; }
+      .card { page-break-inside: avoid; }
+    }
   </style>
 </head>
 <body>
@@ -63,6 +75,7 @@
     <label for="operatorSelect">Operator</label>
     <select id="operatorSelect"><option value="">-- Select Operator --</option></select>
     <button id="generateBtn">Generate</button>
+    <button id="pdfBtn" title="Download as A4 PDF">Generate PDF</button>
     <div id="status" class="small muted" style="margin-left:12px"></div>
   </div>
 
@@ -119,6 +132,7 @@
     const datePicker = document.getElementById('datePicker');
     const operatorSelect = document.getElementById('operatorSelect');
     const btnGenerate = document.getElementById('generateBtn');
+    const btnPDF = document.getElementById('pdfBtn');
     const status = document.getElementById('status');
     const reportOutput = document.getElementById('reportOutput');
     const errorBox = document.getElementById('errorBox');
@@ -557,6 +571,44 @@ deltaquality → count=${cntQualityDelta}`;
       }
     }
 
+    /* ---------- PDF Export (A4) ---------- */
+    async function generatePDF() {
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'pt', 'a4'); // 595.28 x 841.89 pt
+        const report = document.getElementById('reportSection');
+
+        // Use a higher scale for sharper output
+        const canvas = await html2canvas(report, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const imgData = canvas.toDataURL('image/png');
+
+        const pageWidth = doc.internal.pageSize.getWidth();   // 595.28
+        const pageHeight = doc.internal.pageSize.getHeight(); // 841.89
+        const imgWidth = pageWidth;                            // full-width
+        const imgHeight = canvas.height * imgWidth / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight;
+          doc.addPage();
+          doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+
+        const dateStr = document.getElementById('headerDate').textContent.replace('Date: ','') || 'Report';
+        const operator = document.getElementById('headerOperator').textContent.replace('Operator Name: ','') || 'Operator';
+        doc.save(`Operator_Performance_Report_${operator}_${dateStr}.pdf`);
+      } catch (e) {
+        console.error(e);
+        showError('Failed to generate PDF. See console for details.');
+      }
+    }
+
     /* ---------- Events ---------- */
     datePicker.addEventListener('change', () => {
       setStatus('');
@@ -567,6 +619,7 @@ deltaquality → count=${cntQualityDelta}`;
     });
 
     btnGenerate.addEventListener('click', generateReport);
+    btnPDF.addEventListener('click', generatePDF);
 
     (function setToday(){
       const d = new Date();
