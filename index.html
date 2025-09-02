@@ -59,7 +59,7 @@
     }
     function setStatus(txt) { status.textContent = txt || ''; }
     function safeNum(v) {
-      if (v === undefined || v === null) return NaN;
+      if (v === undefined || v === null || v === "") return NaN;
       const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', ''));
       return Number.isFinite(n) ? n : NaN;
     }
@@ -181,7 +181,7 @@
 
           actualProduction += Number.isFinite(ms) ? ms : 0;
           goodProduction += Number.isFinite(safeNum(r.Good_Production)) ? safeNum(r.Good_Production) : 0;
-          plannedProduction += Number.isFinite(stdSpeed) ? stdSpeed : 0; // <-- updated logic
+          plannedProduction += Number.isFinite(stdSpeed) ? stdSpeed : 0;
           plannedTime = Number.isFinite(safeNum(r.Planned_Production_Time)) ? safeNum(r.Planned_Production_Time) : plannedTime;
 
           const dp = safeNum(r.deltaperformance); if (Number.isFinite(dp)) { sumPerf += dp; cntPerf++; }
@@ -199,7 +199,7 @@
 
         let html = '';
 
-        // Production Details Table
+        // 1) Production Details
         html += `<div class="card"><h3>Production Details (SKU-wise)</h3>`;
         html += `<table><thead><tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th></tr></thead><tbody>`;
         for (const sku of Object.keys(skuAgg)) {
@@ -214,7 +214,7 @@
         }
         html += `</tbody></table></div>`;
 
-        // Machine Performance Summary
+        // 2) Machine Performance Summary
         html += `<div class="card"><h3>Machine Performance Summary</h3>`;
         html += `<table><thead><tr><th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th></tr></thead><tbody>`;
         html += `<tr>
@@ -237,7 +237,7 @@
           <td>${(totalDowntime / 60).toFixed(2)}</td>
         </tr></tbody></table></div>`;
 
-        /* --------- STEP 2: Downtime Summary (by Downtime_Reason_Code) --------- */
+        // 3) Downtime Summary (Duration in minutes; source is seconds)
         const dtByReason = {};
         let failures = 0;
         opRows.forEach(r => {
@@ -245,7 +245,8 @@
           if (submit === 1) {
             const reason = r.Downtime_Reason_Code ? String(r.Downtime_Reason_Code).trim() : 'UNKNOWN';
             let durMin = safeNum(r.Downtime_Duration);
-            // If your Downtime_Duration is in seconds, convert: durMin = Number.isFinite(durMin) ? durMin/60 : durMin;
+            // convert SECONDS -> MINUTES
+            durMin = Number.isFinite(durMin) ? (durMin / 60) : durMin;
             if (!dtByReason[reason]) dtByReason[reason] = { occ: 0, totalMin: 0, mttrSamples: [] };
             dtByReason[reason].occ += 1;
             if (Number.isFinite(durMin)) {
@@ -256,22 +257,23 @@
           }
         });
         Object.values(dtByReason).forEach(obj => {
-          obj.mttr = obj.mttrSamples.length ? (obj.mttrSamples.reduce((a,b)=>a+b,0) / obj.mttrSamples.length) : NaN;
-          obj.mtbf = obj.occ ? (totalRuntime / obj.occ) : NaN; // totalRuntime is in minutes
+          obj.mttr = obj.mttrSamples.length ? (obj.mttrSamples.reduce((a,b)=>a+b,0)/obj.mttrSamples.length) : NaN;
+          // MTBF approximation: total runtime minutes / occurrences
+          obj.mtbf = obj.occ ? (totalRuntime / obj.occ) : NaN;
         });
         const overallMTTR = failures ? (Object.values(dtByReason).reduce((a,b)=>a+b.totalMin,0) / failures) : NaN;
-        const overallMTBF = (failures && Number.isFinite(totalRuntime)) ? (totalRuntime / failures) : NaN;
+        const overallMTBF = failures ? (totalRuntime / failures) : NaN;
 
         let dtRows = '';
-        Object.entries(dtByReason).forEach(([reason, obj], i) => {
-          const dtId = `D-${String(101 + i).padStart(3, '0')}`;
+        Object.entries(dtByReason).forEach(([reason,obj],i)=>{
+          const dtId = `D-${String(101+i).padStart(3,'0')}`;
           dtRows += `<tr>
             <td>${dtId}</td>
             <td>${reason}</td>
             <td>${Number(obj.totalMin).toFixed(0)}</td>
             <td>${obj.occ}</td>
-            <td>${Number.isFinite(obj.mtbf) ? Number(obj.mtbf).toFixed(0) : '--'}</td>
-            <td>${Number.isFinite(obj.mttr) ? Number(obj.mttr).toFixed(0) : '--'}</td>
+            <td>${Number.isFinite(obj.mtbf)? obj.mtbf.toFixed(0):'--'}</td>
+            <td>${Number.isFinite(obj.mttr)? obj.mttr.toFixed(0):'--'}</td>
           </tr>`;
         });
 
@@ -280,35 +282,33 @@
             <h3>Alarms & Downtimes During Operation</h3>
             <h4>Downtime Summary</h4>
             <table>
-              <thead>
-                <tr>
-                  <th>Downtime ID</th>
-                  <th>Downtime Reason</th>
-                  <th>Downtime Duration (min)</th>
-                  <th>No. of Times</th>
-                  <th>MTBF (min)</th>
-                  <th>MTTR (min)</th>
-                </tr>
-              </thead>
+              <thead><tr>
+                <th>Downtime ID</th>
+                <th>Downtime Reason</th>
+                <th>Downtime Duration (min)</th>
+                <th>No. of Times</th>
+                <th>MTBF (min)</th>
+                <th>MTTR (min)</th>
+              </tr></thead>
               <tbody>
-                ${dtRows || '<tr><td colspan="6" class="muted">No downtime events found (Downtime_Submit == 1).</td></tr>'}
+                ${dtRows || '<tr><td colspan="6" class="muted">No downtime events</td></tr>'}
               </tbody>
             </table>
             <div class="small muted" style="margin-top:6px">
-              Overall Operator MTBF: ${Number.isFinite(overallMTBF) ? overallMTBF.toFixed(0) : '--'} min
+              Overall Operator MTBF: ${Number.isFinite(overallMTBF)? overallMTBF.toFixed(0):'--'} min
               &nbsp; | &nbsp;
-              Overall Operator MTTR: ${Number.isFinite(overallMTTR) ? overallMTTR.toFixed(0) : '--'} min
+              Overall Operator MTTR: ${Number.isFinite(overallMTTR)? overallMTTR.toFixed(0):'--'} min
             </div>
           </div>`;
 
         reportOutput.innerHTML = html;
 
         debugOutput.style.display = 'block';
-        debugOutput.textContent = `Averages computed from counts:
-        deltaperformance → count=${cntPerf}
-        deltaavailability → count=${cntAvail}
-        deltaoee → count=${cntOee}
-        deltaquality → count=${cntQualityDelta}`;
+        debugOutput.textContent = `Averages computed from counts:\n`+
+          `deltaperformance → count=${cntPerf}\n`+
+          `deltaavailability → count=${cntAvail}\n`+
+          `deltaoee → count=${cntOee}\n`+
+          `deltaquality → count=${cntQualityDelta}`;
 
         setStatus(`Report ready — rows used: ${opRows.length}`);
       } catch (err) {
