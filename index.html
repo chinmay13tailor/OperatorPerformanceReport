@@ -31,7 +31,7 @@
     .header-center h2 { margin:6px 0 0; font-size:18px; font-weight:bold; }
     .header-bottom { display:flex; justify-content:space-between; font-size:13px; margin-top:6px; font-weight:bold; }
 
-    /* Machine Performance visual style (from your sample) */
+    /* Machine Performance */
     .perf-summary { margin-top:10px; border:2px solid #555; }
     .perf-summary th, .perf-summary td { border:1px solid #555; }
     .perf-summary th { background:#e5e7eb; }
@@ -39,27 +39,30 @@
     .perf-subtable th, .perf-subtable td { border:1px solid #555; }
     .perf-subtable th { background:#e5e7eb; }
 
+    /* Gauge grid */
+    .gauge-grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .gauge-card {
+      border:1px solid #e6e9ef; border-radius:10px; padding:10px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+    }
+    .gauge-title { font-weight:700; margin-bottom:6px; }
+    .gauge-canvas { width:160px; height:100px; display:block; }
+    .gauge-value { margin-top:6px; font-weight:700; }
+
     /* Report Footer */
-    .report-footer {
-      border:1px solid #000; border-radius:6px; padding:12px; background:#fff;
-      margin-top:18px;
-    }
-    .footer-remarks { margin-bottom:12px; }
-    .footer-remarks label { font-weight:700; }
-    .remarks-box {
-      width:100%; min-height:48px; border:1px solid #000; border-radius:4px; margin-top:6px; padding:6px; background:#fff;
-    }
-    .footer-signs { display:flex; gap:16px; }
-    .sign-col { flex:1; }
-    .sign-col label { font-weight:700; }
-    .sign-line {
-      border-bottom:1px solid #000; height:30px; margin-top:6px; border-radius:2px;
-    }
-    .sign-meta { display:flex; gap:10px; margin-top:6px; }
-    .sign-meta > div { flex:1; }
-    .sign-input {
-      width:100%; height:26px; border:1px solid #000; border-radius:4px; padding:4px;
-    }
+    .report-footer { border:1px solid #000; border-radius:6px; padding:10px 20px; margin-top:20px; background:#fff; }
+    .footer-section { margin-bottom:16px; }
+    .footer-label { font-weight:bold; display:block; margin-bottom:6px; }
+    .remarks-box { border:1px solid #000; min-height:40px; border-radius:4px; background:#fff; padding:4px; }
+    .signatures { display:flex; justify-content:space-between; margin-top:20px; gap:16px; }
+    .signature { flex:1; }
+    .signature-label { font-weight:bold; display:block; margin-bottom:6px; }
+    .signature-line { border-bottom:1px solid #000; height:30px; margin-top:5px; }
   </style>
 </head>
 <body>
@@ -96,28 +99,20 @@
     <div id="errorBox" class="error"></div>
     <div id="reportOutput"></div>
 
-    <!-- Footer appended after the whole report -->
-    <div id="reportFooter" class="report-footer" style="display:none;">
-      <div class="footer-remarks">
-        <label>Remarks :</label>
-        <div class="remarks-box" contenteditable="true" spellcheck="false"></div>
+    <!-- Footer -->
+    <div class="report-footer" id="reportFooter" style="display:none;">
+      <div class="footer-section">
+        <span class="footer-label">Remarks:</span>
+        <div class="remarks-box" contenteditable="true"></div>
       </div>
-      <div class="footer-signs">
-        <div class="sign-col">
-          <label>Reviewed By :</label>
-          <div class="sign-line"></div>
-          <div class="sign-meta">
-            <div><small class="muted">Name</small><input class="sign-input" type="text" /></div>
-            <div><small class="muted">Date</small><input class="sign-input" type="text" /></div>
-          </div>
+      <div class="signatures">
+        <div class="signature">
+          <span class="signature-label">Reviewed By:</span>
+          <div class="signature-line"></div>
         </div>
-        <div class="sign-col">
-          <label>Checked By :</label>
-          <div class="sign-line"></div>
-          <div class="sign-meta">
-            <div><small class="muted">Name</small><input class="sign-input" type="text" /></div>
-            <div><small class="muted">Date</small><input class="sign-input" type="text" /></div>
-          </div>
+        <div class="signature">
+          <span class="signature-label">Checked By:</span>
+          <div class="signature-line"></div>
         </div>
       </div>
     </div>
@@ -218,6 +213,64 @@
       }
     }
 
+    /* ---------- Gauge Drawing ---------- */
+    function drawGauge(canvas, percent, label) {
+      // percent: 0..100
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+
+      // Geometry
+      const cx = w/2, cy = h*0.95;        // center bottom
+      const r = Math.min(w*0.45, h*0.9);  // radius
+      const start = Math.PI;              // 180°
+      const end   = 2*Math.PI;            // 360°
+
+      // Background arc
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, start, end);
+      ctx.stroke();
+
+      // Value arc (color based on value)
+      const p = Math.max(0, Math.min(100, Number(percent) || 0));
+      const ang = start + (p/100)*(end-start);
+
+      let stroke = '#16a34a'; // green
+      if (p < 60) stroke = '#dc2626';     // red
+      else if (p < 80) stroke = '#f59e0b';// amber
+
+      ctx.strokeStyle = stroke;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, start, ang);
+      ctx.stroke();
+
+      // Ticks (every 20%)
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#9ca3af';
+      for (let i=0;i<=5;i++){
+        const tAng = start + (i/5)*(end-start);
+        const x1 = cx + (r-6)*Math.cos(tAng);
+        const y1 = cy + (r-6)*Math.sin(tAng);
+        const x2 = cx + (r+6)*Math.cos(tAng);
+        const y2 = cy + (r+6)*Math.sin(tAng);
+        ctx.beginPath();
+        ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      }
+
+      // Label
+      ctx.fillStyle = '#111827';
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, cx, cy - r - 6);
+
+      // Value
+      ctx.font = 'bold 18px Arial';
+      ctx.fillText(`${p.toFixed(1)}%`, cx, cy - r/1.8);
+    }
+
     /* ---------- Generate report ---------- */
     async function generateReport() {
       showError('');
@@ -302,7 +355,7 @@
         let html = '';
 
         // 1) Production Details (SKU-wise)
-        html += `<div class="card"><h3>Production Details (SKU-wise)</h3>`;
+        html += `<div class="card"><h3>2. Production Details (SKU-wise)</h3>`;
         html += `<table><thead><tr><th>SKU Name</th><th>Production (Units)</th><th>Runtime (hrs)</th><th>Downtime (hrs)</th><th>Idletime (hrs)</th></tr></thead><tbody>`;
         for (const sku of Object.keys(skuAgg)) {
           const d = skuAgg[sku];
@@ -316,8 +369,36 @@
         }
         html += `</tbody></table></div>`;
 
-        // 2) Machine Performance Summary (with your table layout)
-        html += `<div class="card"><h3>Machine Performance Summary</h3>`;
+        // 2) Machine Performance Summary — Gauges + subtable
+        html += `<div class="card"><h3>3. Machine Performance Summary</h3>`;
+
+        // Gauge grid (4 gauges)
+        html += `
+          <div class="gauge-grid">
+            <div class="gauge-card">
+              <div class="gauge-title">OEE</div>
+              <canvas id="gOEE" class="gauge-canvas" width="160" height="100"></canvas>
+              <div class="gauge-value" id="gOEEVal">--</div>
+            </div>
+            <div class="gauge-card">
+              <div class="gauge-title">Performance</div>
+              <canvas id="gPerf" class="gauge-canvas" width="160" height="100"></canvas>
+              <div class="gauge-value" id="gPerfVal">--</div>
+            </div>
+            <div class="gauge-card">
+              <div class="gauge-title">Availability</div>
+              <canvas id="gAvail" class="gauge-canvas" width="160" height="100"></canvas>
+              <div class="gauge-value" id="gAvailVal">--</div>
+            </div>
+            <div class="gauge-card">
+              <div class="gauge-title">Quality</div>
+              <canvas id="gQual" class="gauge-canvas" width="160" height="100"></canvas>
+              <div class="gauge-value" id="gQualVal">--</div>
+            </div>
+          </div>
+        `;
+
+        // (Keep) KPI summary table if you still want it textual too
         html += `<table class="perf-summary"><thead><tr><th>OEE</th><th>Performance</th><th>Availability</th><th>Quality</th></tr></thead><tbody>`;
         html += `<tr>
           <td>${Number.isFinite(avgOee) ? avgOee.toFixed(2) + '%' : '--'}</td>
@@ -326,6 +407,7 @@
           <td>${Number.isFinite(displayQuality) ? Number(displayQuality).toFixed(2) + '%' : '--'}</td>
         </tr></tbody></table>`;
 
+        // detail subtable
         html += `<table class="perf-subtable" style="margin-top:10px;"><thead><tr>
           <th>Performance</th><th>Availability</th><th>Quality</th>
         </tr></thead><tbody>
@@ -387,7 +469,8 @@
 
         html += `
           <div class="card">
-            <h3>Downtimes During Operation</h3>
+            <h3>4. Alarms & Downtimes During Operation</h3>
+            <h4>Downtime Summary</h4>
             <table>
               <thead><tr>
                 <th>Downtime ID</th>
@@ -408,7 +491,7 @@
             </div>
           </div>`;
 
-        // 4) Energy Consumption & Losses (Per_Min_Consumption split by flags)
+        // 5) Energy Consumption & Losses (Per_Min_Consumption split by flags)
         let runtimeKwh = 0, downtimeKwh = 0, idleKwh = 0, totalKwh = 0;
         opRows.forEach(r => {
           const cons = safeNum(r.Per_Min_Consumption);
@@ -432,7 +515,7 @@
 
         html += `
           <div class="card">
-            <h3>Energy Consumption & Losses</h3>
+            <h3>5. Energy Consumption & Losses</h3>
             <table>
               <thead>
                 <tr>
@@ -471,7 +554,7 @@
             </table>
           </div>`;
 
-        // 5) Supervisor Insights
+        // 6) Supervisor Insights
         const qualityPct = Number.isFinite(displayQuality) ? displayQuality.toFixed(1) : '--';
         const qualityText = `Quality Performance: ${operator} maintained a strong quality output of ${qualityPct}%, ensuring minimal defects despite operational challenges.`;
 
@@ -489,13 +572,13 @@
         const oeeText = `OEE Review: Current OEE stands at ${oeePct}%, which is fair but can be further improved, particularly by addressing downtime reduction in SKU-B production.`;
 
         html += `<div class="card">
-          <h3>Supervisor Insights</h3>
+          <h3>6. Supervisor Insights</h3>
           <p>a: ${qualityText}</p>
           <p>b: ${downtimeText}</p>
           <p>c: ${oeeText}</p>
         </div>`;
 
-        // 6) Recommendations
+        // 7) Recommendations
         let recTextA = 'Preventive Maintenance: No downtime data available.';
         let recTextB = 'Training Support: No downtime data available.';
         if (Object.keys(dtByReason).length) {
@@ -521,7 +604,7 @@
         const recTextD = `OEE Improvement Plan: Current bottleneck is ${weakest || '—'}. Set a target to improve OEE from ${Number.isFinite(avgOee)? avgOee.toFixed(1):'77.7'}% to ${oeeImproveTarget}%+ by improving ${weakest || 'the weakest KPI'}.`;
 
         html += `<div class="card">
-          <h3>Recommendations</h3>
+          <h3>7. Recommendations</h3>
           <p>a: ${recTextA}</p>
           <p>b: ${recTextB}</p>
           <p>c: ${recTextC}</p>
@@ -530,6 +613,28 @@
 
         // Render built HTML
         reportOutput.innerHTML = html;
+
+        // Draw Gauges after DOM is ready
+        const oeeVal = Number.isFinite(avgOee) ? +avgOee.toFixed(2) : NaN;
+        const perfVal = Number.isFinite(avgPerf) ? +avgPerf.toFixed(2) : NaN;
+        const availVal = Number.isFinite(avgAvail) ? +avgAvail.toFixed(2) : NaN;
+        const qualVal = Number.isFinite(displayQuality) ? +Number(displayQuality).toFixed(2) : NaN;
+
+        const gOEE = document.getElementById('gOEE');
+        const gPerf = document.getElementById('gPerf');
+        const gAvail = document.getElementById('gAvail');
+        const gQual = document.getElementById('gQual');
+
+        if (gOEE) drawGauge(gOEE, oeeVal || 0, 'OEE');
+        if (gPerf) drawGauge(gPerf, perfVal || 0, 'Performance');
+        if (gAvail) drawGauge(gAvail, availVal || 0, 'Availability');
+        if (gQual) drawGauge(gQual, qualVal || 0, 'Quality');
+
+        const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = Number.isFinite(v) ? `${v.toFixed(1)}%` : '--'; };
+        setVal('gOEEVal', oeeVal);
+        setVal('gPerfVal', perfVal);
+        setVal('gAvailVal', availVal);
+        setVal('gQualVal', qualVal);
 
         // Show footer AFTER report is rendered
         reportFooter.style.display = 'block';
