@@ -394,6 +394,42 @@
           <p>c: ${oeeText}</p>
         </div>`;
 
+        // 6) Recommendations
+        // a: Preventive Maintenance for most occurred downtime
+        let recTextA = 'Preventive Maintenance: No downtime data available.';
+        let recTextB = 'Training Support: No downtime data available.';
+        if (Object.keys(dtByReason).length) {
+          let top = Object.entries(dtByReason).sort((a,b)=>b[1].occ - a[1].occ)[0];
+          const reason = top[0];
+          recTextA = `Preventive Maintenance: Schedule periodic checks for systems to reduce recurring '${reason}' issues.`;
+          recTextB = `Training Support: Provide ${operator} with quick-resolution protocols for handling '${reason}' issues, reducing reliance on maintenance.`;
+        }
+
+        // c: SKU with maximum downtime
+        let recTextC = 'SKU-B Focus: No SKU downtime data available.';
+        if (Object.keys(skuAgg).length) {
+          let skuDowntimeSorted = Object.entries(skuAgg).sort((a,b)=>b[1].downtime - a[1].downtime)[0];
+          const skuName = skuDowntimeSorted[0];
+          recTextC = `SKU Focus: Investigate ${skuName} production processes to identify specific bottlenecks causing downtime and optimize machine settings/preparations.`;
+        }
+
+        // d: OEE Improvement Plan - decide weakest factor
+        let weakest = '';
+        let val = Infinity;
+        if (Number.isFinite(avgAvail) && avgAvail < val) { weakest = 'Availability'; val = avgAvail; }
+        if (Number.isFinite(avgPerf) && avgPerf < val) { weakest = 'Performance'; val = avgPerf; }
+        if (Number.isFinite(displayQuality) && displayQuality < val) { weakest = 'Quality'; val = displayQuality; }
+        const oeeImproveTarget = Number.isFinite(avgOee)? (avgOee+5).toFixed(1):'82';
+        const recTextD = `OEE Improvement Plan: Current bottleneck is ${weakest}. Set a target to improve OEE from ${Number.isFinite(avgOee)? avgOee.toFixed(1):'77.7'}% to ${oeeImproveTarget}%+ by improving ${weakest}.`;
+
+        html += `<div class=\"card\">
+          <h3>Recommendations</h3>
+          <p>a: ${recTextA}</p>
+          <p>b: ${recTextB}</p>
+          <p>c: ${recTextC}</p>
+          <p>d: ${recTextD}</p>
+        </div>`;
+
         reportOutput.innerHTML = html;
 
         debugOutput.style.display = 'block';
